@@ -12,7 +12,7 @@ RUN corepack enable pnpm
 
 # 2. 複製依賴檔案並安裝
 COPY package.json pnpm-lock.yaml* .npmrc* ./
-RUN pnpm i
+RUN pnpm i --no-frozen-lockfile
 
 # ==========================================
 # 階段二：構建專案 (Builder Stage)
