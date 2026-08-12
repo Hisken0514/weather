@@ -18,7 +18,7 @@ RUN dotnet restore src/test.backend/test.csproj
 
 # 複製整個專案的所有檔案
 COPY . .
-
+ 
 # 切換到後端目錄進行打包
 WORKDIR /src/test.backend
 RUN dotnet build test.csproj -c $BUILD_CONFIGURATION -o /app/build
@@ -27,7 +27,7 @@ RUN dotnet build test.csproj -c $BUILD_CONFIGURATION -o /app/build
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish test.csproj -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
-
+ 
 # 4. Final 運行階段
 FROM base AS final
 WORKDIR /app

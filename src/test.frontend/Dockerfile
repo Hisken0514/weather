@@ -1,5 +1,5 @@
 ﻿# ==========================================
-# 階段一：安裝依賴 (Deps Stage)
+# 階段一：安裝依賴 (Deps Stage) 
 # ==========================================
 FROM node:24-alpine AS deps
 RUN apk add --no-cache libc6-compat
