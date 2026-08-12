@@ -1,31 +1,61 @@
 ﻿# ==========================================
-# 階段一：構建階段 (Build Stage)
+# 階段一：安裝依賴 (Deps Stage)
 # ==========================================
-FROM node:20-alpine AS build-stage
-
-# 設定容器內的工作目錄
+FROM node:20-alpine AS deps
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# 1. 關鍵修正：啟用 Node.js 內建的 corepack 以支援 pnpm
+# 1. 啟用 corepack 以支援 pnpm
 RUN corepack enable pnpm
 
-# 2. 複製 package.json 以及 pnpm-lock.yaml (確保凍結版本安裝成功)
+# 2. 複製依賴檔案並安裝
 COPY package.json pnpm-lock.yaml* ./
 RUN pnpm i --frozen-lockfile
 
-# 3. 複製前端的所有程式碼並執行打包
+# ==========================================
+# 階段二：構建專案 (Builder Stage)
+# ==========================================
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# 1. 啟用 corepack
+RUN corepack enable pnpm
+
+# 2. 複製 node_modules 與專案檔案
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# 3. 設定生產環境編譯變數
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV production
+
+# 4. 執行 Next.js 打包 (會產出 .next/standalone)
 RUN pnpm run build
 
 # ==========================================
-# 階段二：運行階段 (Production Stage)
+# 階段三：正式運行 (Runner Stage)
 # ==========================================
-FROM nginx:alpine AS production-stage
+FROM node:20-alpine AS runner
+WORKDIR /app
 
-# 1. 從第一階段將打包好的靜態檔案複製到 Nginx 的預設網頁目錄
-#    (若使用的是 Vite / Next.js export 產出為 dist，請確認輸出目錄名稱)
-COPY --from=build-stage /app/dist /usr/share/nginx/html
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
 
-# 2. 暴露 80 Port 並啟動 Nginx
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# 1. 建立非 root 權限使用者（提升容器安全性）
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# 2. 複製靜態檔案與獨立打包結果 (Standalone)
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT 3000
+ENV HOSTNAME "0.0.0.0"
+
+# 3. 直接用 Node 執行 standalone 產出的 server.js
+CMD ["node", "server.js"]

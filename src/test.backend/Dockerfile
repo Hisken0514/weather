@@ -18,7 +18,7 @@ RUN dotnet restore "src/test.backend/test.csproj"
 COPY . .
 
 # 修正重點：正確切換到後端專案目錄 (從 /src 切換至 /src/src/test.backend)
-WORKDIR "/src/test.backend"
+WORKDIR "/test.backend"
 RUN dotnet build "test.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 # 3. 發布階段
