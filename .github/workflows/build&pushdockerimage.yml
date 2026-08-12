@@ -7,7 +7,6 @@ on:
   pull_request:
     branches:
       - '*'
-
   workflow_dispatch:
     inputs:
       build_target:
@@ -19,7 +18,7 @@ on:
           - 'all'
           - 'frontend_only'
           - 'backend_only'
-  
+
 permissions:
   contents: read
   packages: write
@@ -37,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
-      backend:  ${{ steps.filter.outputs.backend }} # 修正點 1：將原本漏掉的 backend 輸出補上
+      backend:  ${{ steps.filter.outputs.backend }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -45,9 +44,9 @@ jobs:
         with:
           filters: |
             frontend:
-              - 'src/test.frontend/**' # 指定的前端位置
+              - 'src/test.frontend/**'
             backend:
-              - 'src/test.backend/**' # 指定的後端位置
+              - 'src/test.backend/**'
 
   # ============================================================
   # Job 1: Frontend
@@ -55,7 +54,10 @@ jobs:
   build-frontend:
     name: Build frontend
     needs: changes
-    if: needs.changes.outputs.frontend == 'true'
+    # 修正重點：區分「手動觸發」與「自動 Push/PR 觸發」
+    if: |
+      (github.event_name == 'workflow_dispatch' && (inputs.build_target == 'all' || inputs.build_target == 'frontend_only')) ||
+      (github.event_name != 'workflow_dispatch' && needs.changes.outputs.frontend == 'true')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -76,8 +78,8 @@ jobs:
           tags: |
             type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             type=sha,prefix=sha-,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-            type=raw,value=test,enable=${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') }}
-            type=sha,prefix=test-sha-,enable=${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') }}
+            type=raw,value=test,enable=${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') || github.event_name == 'workflow_dispatch' }}
+            type=sha,prefix=test-sha-,enable=${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') || github.event_name == 'workflow_dispatch' }}
             type=ref,event=pr
 
       - name: Build and push
@@ -97,7 +99,10 @@ jobs:
   build-backend:
     name: Build backend
     needs: changes
-    if: needs.changes.outputs.backend == 'true' # 修正點 2：對應到 changes.outputs.backend
+    # 修正重點：區分「手動觸發」與「自動 Push/PR 觸發」
+    if: |
+      (github.event_name == 'workflow_dispatch' && (inputs.build_target == 'all' || inputs.build_target == 'backend_only')) ||
+      (github.event_name != 'workflow_dispatch' && needs.changes.outputs.backend == 'true')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -118,8 +123,8 @@ jobs:
           tags: |
             type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             type=sha,prefix=sha-,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-            type=raw,value=test,enable=${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') }}
-            type=sha,prefix=test-sha-,enable=${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') }}
+            type=raw,value=test,enable=${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') || github.event_name == 'workflow_dispatch' }}
+            type=sha,prefix=test-sha-,enable=${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') || github.event_name == 'workflow_dispatch' }}
             type=ref,event=pr
 
       - name: Build and push
