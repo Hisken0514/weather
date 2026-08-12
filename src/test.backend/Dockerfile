@@ -10,11 +10,11 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 
 # 關鍵：工作目錄直接設為根目錄 /
-WORKDIR /
+WORKDIR /src
 
 # 複製 csproj 並執行 restore
-COPY src/test.backend/test.csproj src/test.backend/
-RUN dotnet restore src/test.backend/test.csproj
+COPY test.backend/test.csproj test.backend/
+RUN dotnet restore test.backend/test.csproj
 
 # 複製整個專案的所有檔案
 COPY . .

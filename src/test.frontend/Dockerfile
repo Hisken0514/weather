@@ -17,7 +17,7 @@ RUN pnpm i --verbose
 # ==========================================
 # 階段二：構建專案 (Builder Stage)
 # ==========================================
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 
 # 1. 啟用 corepack
@@ -27,21 +27,15 @@ RUN corepack enable pnpm
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# 3. 設定生產環境編譯變數
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV NODE_ENV production
-
 # 4. 執行 Next.js 打包 (會產出 .next/standalone)
 RUN pnpm run build
 
 # ==========================================
 # 階段三：正式運行 (Runner Stage)
 # ==========================================
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
 
 # 1. 建立非 root 權限使用者（提升容器安全性）
 RUN addgroup --system --gid 1001 nodejs
