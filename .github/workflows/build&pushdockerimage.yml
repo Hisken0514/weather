@@ -9,6 +9,16 @@ on:
       - '*'
 
   workflow_dispatch:
+    inputs:
+      build_target:
+        description: '選擇要打包的目標'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'frontend_only'
+          - 'backend_only'
   
 permissions:
   contents: read
