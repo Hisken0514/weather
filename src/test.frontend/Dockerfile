@@ -9,11 +9,11 @@ WORKDIR /app
 # 1. 先複製 package.json 相關檔案並安裝套件
 #    (這樣做可以利用 Docker 快取，只要 package.json 沒變就不需要重新 npm install)
 COPY package*.json ./
-RUN npm ci
+RUN pnpm i --frozen-lockfile
 
 # 2. 複製前端的所有程式碼並執行打包
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
 # ==========================================
 # 階段二：運行階段 (Production Stage)
