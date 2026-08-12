@@ -130,7 +130,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: ./src
+          context: ./src/test.backend
           file: ./src/test.backend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
