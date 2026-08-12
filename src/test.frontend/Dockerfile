@@ -11,7 +11,7 @@ RUN apk add --no-cache libc6-compat python3 make g++
 RUN corepack enable pnpm
 
 # 2. 複製依賴檔案並安裝
-COPY package.json pnpm-lock.yaml* ./
+COPY package.json pnpm-lock.yaml* .npmrc* ./
 RUN pnpm i
 
 # ==========================================
@@ -35,7 +35,6 @@ RUN pnpm run build
 # ==========================================
 FROM node:24-alpine AS runner
 WORKDIR /app
-
 
 # 1. 建立非 root 權限使用者（提升容器安全性）
 RUN addgroup --system --gid 1001 nodejs
