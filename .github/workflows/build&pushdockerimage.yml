@@ -45,7 +45,7 @@ jobs:
         with:
           filters: |
             frontend:
-              - 'src/test.fronted/**' # 指定的前端位置
+              - 'src/test.frontend/**' # 指定的前端位置
             backend:
               - 'src/test.backend/**' # 指定的後端位置
 
