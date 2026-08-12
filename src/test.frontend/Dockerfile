@@ -6,12 +6,14 @@ FROM node:20-alpine AS build-stage
 # 設定容器內的工作目錄
 WORKDIR /app
 
-# 1. 先複製 package.json 相關檔案並安裝套件
-#    (這樣做可以利用 Docker 快取，只要 package.json 沒變就不需要重新 npm install)
-COPY package*.json ./
+# 1. 關鍵修正：啟用 Node.js 內建的 corepack 以支援 pnpm
+RUN corepack enable pnpm
+
+# 2. 複製 package.json 以及 pnpm-lock.yaml (確保凍結版本安裝成功)
+COPY package.json pnpm-lock.yaml* ./
 RUN pnpm i --frozen-lockfile
 
-# 2. 複製前端的所有程式碼並執行打包
+# 3. 複製前端的所有程式碼並執行打包
 COPY . .
 RUN pnpm run build
 
@@ -21,12 +23,9 @@ RUN pnpm run build
 FROM nginx:alpine AS production-stage
 
 # 1. 從第一階段將打包好的靜態檔案複製到 Nginx 的預設網頁目錄
-#    注意：若是 Vite/Vue 預設產出目錄是 dist；若是傳統 Create React App 則是 build
+#    (若使用的是 Vite / Next.js export 產出為 dist，請確認輸出目錄名稱)
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 
-# 2. (可選) 若前端有使用 React Router / Vue Router 的 History 模式，可複製自訂 Nginx 設定檔
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# 3. 暴露 80 Port 並啟動 Nginx
+# 2. 暴露 80 Port 並啟動 Nginx
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
