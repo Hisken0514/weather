@@ -1,7 +1,7 @@
 ﻿# ==========================================
 # 階段一：安裝依賴 (Deps Stage)
 # ==========================================
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
@@ -10,7 +10,7 @@ RUN corepack enable pnpm
 
 # 2. 複製依賴檔案並安裝
 COPY package.json pnpm-lock.yaml* ./
-RUN pnpm i --frozen-lockfile
+RUN pnpm i
 
 # ==========================================
 # 階段二：構建專案 (Builder Stage)
