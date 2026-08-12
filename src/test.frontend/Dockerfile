@@ -3,16 +3,16 @@
 # ==========================================
 FROM node:24-alpine AS deps
 RUN apk add --no-cache libc6-compat
+
 WORKDIR /app
 
-
 RUN apk add --no-cache libc6-compat python3 make g++
-# 1. 啟用 corepack 以支援 pnpm
+# 啟用 corepack 以支援 pnpm
 RUN corepack enable pnpm
 
 # 2. 複製依賴檔案並安裝
 COPY package.json pnpm-lock.yaml* ./
-RUN pnpm i --verbose
+RUN pnpm i
 
 # ==========================================
 # 階段二：構建專案 (Builder Stage)
@@ -50,8 +50,8 @@ USER nextjs
 
 EXPOSE 3000
 
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
 # 3. 直接用 Node 執行 standalone 產出的 server.js
 CMD ["node", "server.js"]
