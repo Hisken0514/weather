@@ -29,6 +29,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 var app = builder.Build();
 
+// 自動建立資料表（無 migration 時使用）
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated();
+}
+
 // 3. 讓 Swagger 在所有環境（包含 Production）都能開啟
 app.UseSwagger();
 app.UseSwaggerUI(c =>

@@ -22,7 +22,7 @@ COPY . .
 # 5. 設定環境變數並編譯
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-
+ARG NEXT_PUBLIC_BASEURL
 RUN pnpm run build
 
 # ==========================================

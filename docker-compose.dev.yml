@@ -22,6 +22,7 @@ services:
       - "8080:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: "http://+:8080"
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=testdb;Username=postgres;Password=12345!"
     depends_on:
       db:
@@ -31,10 +32,12 @@ services:
     build:
       context: ./src/test.frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BASEURL: http://localhost:8080
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
     depends_on:
       - backend
 

@@ -6,7 +6,7 @@ using test.Models;
 namespace test.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 public class WeatherForecastController : ControllerBase
 {
     private readonly AppDbContext _context;
