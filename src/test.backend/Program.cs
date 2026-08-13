@@ -3,6 +3,10 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// 1. 確保監聽 0.0.0.0（允許 Docker / 外部網卡連線）
+var urls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "http://0.0.0.0:5000";
+builder.WebHost.UseUrls(urls);
+
 // Add services to the container.
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -17,29 +21,22 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+// 2. 自動讀取 ConnectionStrings:DefaultConnection 環境變數
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{   
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        // 設定 Swagger UI 端點
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
-        
-        // 若希望啟動專案時直接顯示 Swagger 頁面 (根目錄)，可設為空字串
-        c.RoutePrefix = string.Empty;
-    });
-    app.MapOpenApi();
-}
-
-// app.UseHttpsRedirection();
+// 3. 讓 Swagger 在所有環境（包含 Production）都能開啟
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
+    c.RoutePrefix = string.Empty; // 根目錄直接開啟 Swagger
+});
+app.MapOpenApi();
 
 app.UseCors("AllowAll");
 

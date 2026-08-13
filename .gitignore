@@ -6,3 +6,5 @@ riderModule.iml
 .next
 .idea
 node_modules
+.env
+.env.*
