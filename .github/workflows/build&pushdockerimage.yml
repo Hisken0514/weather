@@ -93,7 +93,7 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,scope=frontend,mode=max
           build-args: |
-            NEXT_PUBLIC_BASEURL=https://docker.isha.net/api
+            NEXT_PUBLIC_BASEURL=https://weather.isha.net/api
 
   # ============================================================
   # Job 2: Backend
