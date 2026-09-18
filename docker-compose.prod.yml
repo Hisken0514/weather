@@ -24,6 +24,24 @@ services:
       start_period: 15s
 
   # ===========================================
+  # Forma 自己的資料庫 (PostgreSQL) — 測試主機沒有現成的，補一個容器
+  # ===========================================
+  forma-db:
+    image: postgres:17-alpine
+    container_name: forma-postgres
+    environment:
+      - POSTGRES_DB=forma
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${FORMA_DB_PASSWORD}
+    volumes:
+      - forma-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 5
+
+  # ===========================================
   # Forma — 表單系統 (API + Web SPA 合併)
   # ===========================================
   forma:
@@ -38,6 +56,9 @@ services:
       - InternalApi__Secret=IshaKpi@Internal2026!
     volumes:
       - forma-uploads:/app/uploads
+    depends_on:
+      forma-db:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
@@ -45,6 +66,26 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  # ===========================================
+  # KPI 主資料庫 (SQL Server) — 測試主機沒有現成的，補一個容器
+  # ===========================================
+  kpi-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: kpi-mssql
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${KPI_DB_SA_PASSWORD}
+      - MSSQL_PID=Express
+    volumes:
+      - kpi-mssql-data:/var/opt/mssql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   # ===========================================
   # Redis — KPI 系統快取
@@ -116,6 +157,8 @@ services:
         condition: service_healthy
       kpi-agent-db:
         condition: service_healthy
+      kpi-db:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
@@ -139,6 +182,8 @@ services:
     restart: unless-stopped
 
 volumes:
+  forma-db-data:
+    driver: local
   forma-uploads:
     driver: local
   kpi-redis-data:
@@ -150,4 +195,6 @@ volumes:
   kpi-agent-db-data:
     driver: local
   kpi-agent-documents:
+    driver: local
+  kpi-mssql-data:
     driver: local
