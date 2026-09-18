@@ -245,8 +245,12 @@ export async function middleware(req: NextRequest) {
     const rawPath = req.nextUrl.pathname;
     const cleanedPath = rawPath.replace(new RegExp(`^${basePath}`), "");
 
-    // 如果是 proxy 路徑，直接處理並放行
-    if (cleanedPath.startsWith("/api")) {
+    // 如果是 proxy 路徑，直接處理並放行——/oauth、/.well-known 是 MCP OAuth 2.1
+    // Authorization Server 的 RFC 端點（discovery/DCR/authorize/token），規範要求對外
+    // 完全公開，不能被這裡的登入驗證擋下來（連 discovery 都要登入的話，外部 MCP client
+    // 第一步 metadata 探索就會失敗）。McpOAuthController 內部該擋登入的動作
+    // （/oauth/authorize/pending、/oauth/authorize/decision）自己有 [Authorize]，這裡不用管。
+    if (cleanedPath.startsWith("/api") || cleanedPath.startsWith("/oauth") || cleanedPath.startsWith("/.well-known")) {
         return handleProxyRequest(req);
 
     }
