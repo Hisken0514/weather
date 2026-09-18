@@ -41,6 +41,10 @@ namespace WebAPI1.Migrations
                 oldType: "nvarchar(100)",
                 oldMaxLength: 100);
 
+            migrationBuilder.DropPrimaryKey(
+                name: "PK_DataChangeLogs",
+                table: "DataChangeLogs");
+
             migrationBuilder.AlterColumn<long>(
                 name: "Id",
                 table: "DataChangeLogs",
@@ -50,6 +54,11 @@ namespace WebAPI1.Migrations
                 oldType: "int")
                 .Annotation("SqlServer:Identity", "1, 1")
                 .OldAnnotation("SqlServer:Identity", "1, 1");
+
+            migrationBuilder.AddPrimaryKey(
+                name: "PK_DataChangeLogs",
+                table: "DataChangeLogs",
+                column: "Id");
 
             migrationBuilder.AddColumn<string>(
                 name: "Action",
@@ -148,6 +157,10 @@ namespace WebAPI1.Migrations
                 oldType: "nvarchar(max)",
                 oldNullable: true);
 
+            migrationBuilder.DropPrimaryKey(
+                name: "PK_DataChangeLogs",
+                table: "DataChangeLogs");
+
             migrationBuilder.AlterColumn<int>(
                 name: "Id",
                 table: "DataChangeLogs",
@@ -157,6 +170,11 @@ namespace WebAPI1.Migrations
                 oldType: "bigint")
                 .Annotation("SqlServer:Identity", "1, 1")
                 .OldAnnotation("SqlServer:Identity", "1, 1");
+
+            migrationBuilder.AddPrimaryKey(
+                name: "PK_DataChangeLogs",
+                table: "DataChangeLogs",
+                column: "Id");
 
             migrationBuilder.AddColumn<string>(
                 name: "ModifiedBy",

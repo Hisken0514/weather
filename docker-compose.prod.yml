@@ -130,7 +130,7 @@ services:
   # KPI API 後端
   # ===========================================
   kpibackend:
-    image: ghcr.io/hisken0514/weather/kpi-api:test
+    image: ghcr.io/hisken0514/weather/kpi-api:latest
     container_name: kpi-api
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
