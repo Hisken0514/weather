@@ -45,7 +45,7 @@ services:
   # Forma — 表單系統 (API + Web SPA 合併)
   # ===========================================
   forma:
-    image: ghcr.io/idsl5397/ishanewkpi/forma:latest
+    image: ghcr.io/hisken0514/weather/forma:latest
     container_name: forma-app-kpi
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
@@ -130,7 +130,7 @@ services:
   # KPI API 後端
   # ===========================================
   kpibackend:
-    image: ghcr.io/idsl5397/ishanewkpi/kpi-api:latest
+    image: ghcr.io/hisken0514/weather/kpi-api:latest
     container_name: kpi-api
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
@@ -171,7 +171,7 @@ services:
   # KPI Web 前端 (Next.js)
   # ===========================================
   kpi-web:
-    image: ghcr.io/idsl5397/ishanewkpi/kpi-web:latest
+    image: ghcr.io/hisken0514/weather/kpi-web:latest
     container_name: kpi-web
     environment:
       - NODE_ENV=production
