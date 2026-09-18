@@ -61,9 +61,11 @@ public class McpOAuthController : ControllerBase
     public IActionResult ProtectedResourceMetadata()
     {
         var issuer = ResolveIssuer();
+        // /mcp 本身掛在後端根目錄，但外部客戶端要打的是 KPI.Web 的 /api/:path* rewrite 轉進來的
+        // 路徑（見 next.config.js），也就是 {issuer}/api/mcp，不是 {issuer}/mcp。
         return Ok(new
         {
-            resource = $"{issuer}/mcp",
+            resource = $"{issuer}/api/mcp",
             authorization_servers = new[] { issuer },
         });
     }
