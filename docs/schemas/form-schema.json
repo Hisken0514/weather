@@ -1,0 +1,1317 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://forma.example.com/schemas/form-schema.json",
+  "title": "Form Schema",
+  "description": "JSON Schema for validating dynamic form definitions",
+  "type": "object",
+  "required": ["version", "id", "metadata", "pages"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version",
+      "pattern": "^\\d+\\.\\d+$"
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique form identifier"
+    },
+    "metadata": {
+      "$ref": "#/definitions/FormMetadata"
+    },
+    "settings": {
+      "$ref": "#/definitions/FormSettings"
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/FormPage"
+      }
+    },
+    "theme": {
+      "$ref": "#/definitions/FormTheme"
+    }
+  },
+  "definitions": {
+    "FormMetadata": {
+      "type": "object",
+      "required": ["title"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string",
+          "default": "zh-TW"
+        },
+        "submitButtonText": {
+          "type": "string"
+        },
+        "successMessage": {
+          "type": "string"
+        }
+      }
+    },
+    "FormSettings": {
+      "type": "object",
+      "properties": {
+        "allowDraft": {
+          "type": "boolean",
+          "default": true
+        },
+        "allowMultipleSubmissions": {
+          "type": "boolean",
+          "default": false
+        },
+        "requireAuthentication": {
+          "type": "boolean",
+          "default": true
+        },
+        "showProgressBar": {
+          "type": "boolean",
+          "default": true
+        },
+        "enableAutoSave": {
+          "type": "boolean",
+          "default": true
+        },
+        "autoSaveInterval": {
+          "type": "integer",
+          "minimum": 10,
+          "default": 30
+        },
+        "displayMode": {
+          "$ref": "#/definitions/DisplayModeSettings"
+        }
+      }
+    },
+    "DisplayModeSettings": {
+      "type": "object",
+      "properties": {
+        "default": {
+          "type": "string",
+          "enum": ["card", "classic", "hybrid"],
+          "default": "hybrid"
+        },
+        "allowUserSwitch": {
+          "type": "boolean",
+          "default": true
+        },
+        "cardMode": {
+          "$ref": "#/definitions/CardModeSettings"
+        },
+        "classicMode": {
+          "$ref": "#/definitions/ClassicModeSettings"
+        }
+      }
+    },
+    "CardModeSettings": {
+      "type": "object",
+      "properties": {
+        "showProgressBar": {
+          "type": "boolean",
+          "default": true
+        },
+        "showQuestionNumber": {
+          "type": "boolean",
+          "default": true
+        },
+        "animation": {
+          "type": "string",
+          "enum": ["slide", "fade", "none"],
+          "default": "slide"
+        },
+        "stackedCards": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "default": 3
+        },
+        "autoAdvance": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "ClassicModeSettings": {
+      "type": "object",
+      "properties": {
+        "questionsPerPage": {
+          "oneOf": [
+            { "type": "string", "enum": ["all", "section"] },
+            { "type": "integer", "minimum": 1 }
+          ],
+          "default": "section"
+        },
+        "showAllValidationErrors": {
+          "type": "boolean",
+          "default": true
+        },
+        "stickyNavigation": {
+          "type": "boolean",
+          "default": true
+        },
+        "columnLayout": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "FormPage": {
+      "type": "object",
+      "required": ["id", "fields"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        },
+        "forceDisplayMode": {
+          "type": "string",
+          "enum": ["card", "classic"],
+          "description": "Force this page to use a specific display mode"
+        }
+      }
+    },
+    "FormTheme": {
+      "type": "object",
+      "properties": {
+        "primaryColor": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "fontFamily": {
+          "type": "string"
+        }
+      }
+    },
+    "FieldType": {
+      "type": "string",
+      "enum": [
+        "text",
+        "textarea",
+        "multipletext",
+        "email",
+        "phone",
+        "url",
+        "password",
+        "number",
+        "slider",
+        "rating",
+        "date",
+        "time",
+        "datetime",
+        "select",
+        "multiselect",
+        "radio",
+        "checkbox",
+        "boolean",
+        "imagepicker",
+        "ranking",
+        "matrix",
+        "matrixdropdown",
+        "matrixdynamic",
+        "file",
+        "image",
+        "signature",
+        "panel",
+        "section",
+        "html",
+        "hidden",
+        "expression",
+        "paneldynamic"
+      ]
+    },
+    "LayoutWidth": {
+      "type": "string",
+      "enum": ["full", "half", "third", "quarter", "auto"]
+    },
+    "FieldLayout": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "$ref": "#/definitions/LayoutWidth"
+        },
+        "order": {
+          "type": "integer"
+        }
+      }
+    },
+    "Field": {
+      "type": "object",
+      "required": ["id", "type", "name"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/definitions/FieldType"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "defaultValue": {},
+        "required": {
+          "type": "boolean",
+          "default": false
+        },
+        "disabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "readOnly": {
+          "type": "boolean",
+          "default": false
+        },
+        "visible": {
+          "type": "boolean",
+          "default": true
+        },
+        "validation": {
+          "$ref": "#/definitions/FieldValidation"
+        },
+        "conditional": {
+          "$ref": "#/definitions/Conditional"
+        },
+        "layout": {
+          "$ref": "#/definitions/FieldLayout"
+        },
+        "properties": {
+          "type": "object"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": ["text", "textarea", "email", "phone", "url", "password"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/TextFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "multipletext" }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/MultipleTextFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "enum": ["number", "slider"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/NumberFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "enum": ["select", "multiselect", "radio", "checkbox"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/SelectFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "boolean" }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/BooleanFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "imagepicker" }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/ImagePickerFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "ranking" }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/RankingFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "enum": ["date", "time", "datetime"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/DateTimeFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "enum": ["file", "image"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/FileFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "rating" }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/RatingFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "matrix" }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/MatrixFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "matrixdropdown" }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/MatrixDropdownFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "matrixdynamic" }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/MatrixDynamicFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "signature" }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/SignatureFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "expression" }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/ExpressionFieldProperties"
+              }
+            },
+            "required": ["id", "type", "name", "properties"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "panel" }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/PanelFieldProperties"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "paneldynamic" }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/PanelDynamicFieldProperties"
+              }
+            },
+            "required": ["id", "type", "name", "properties"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "html" }
+            }
+          },
+          "then": {
+            "properties": {
+              "properties": {
+                "$ref": "#/definitions/HtmlFieldProperties"
+              }
+            },
+            "required": ["id", "type", "name", "properties"]
+          }
+        }
+      ]
+    },
+    "TextFieldProperties": {
+      "type": "object",
+      "properties": {
+        "minLength": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxLength": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pattern": {
+          "type": ["string", "null"]
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "inputMask": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "MultipleTextItem": {
+      "type": "object",
+      "required": ["name", "label"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        }
+      }
+    },
+    "MultipleTextFieldProperties": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/MultipleTextItem"
+          }
+        },
+        "colCount": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "NumberFieldProperties": {
+      "type": "object",
+      "properties": {
+        "min": {
+          "type": ["number", "null"]
+        },
+        "max": {
+          "type": ["number", "null"]
+        },
+        "step": {
+          "type": "number"
+        },
+        "precision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unit": {
+          "type": "string"
+        },
+        "showButtons": {
+          "type": "boolean"
+        }
+      }
+    },
+    "FieldOption": {
+      "type": "object",
+      "required": ["value", "label"],
+      "properties": {
+        "value": {
+          "type": ["string", "number"]
+        },
+        "label": {
+          "type": "string"
+        },
+        "disabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "OptionsSource": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["api", "lookup"]
+        },
+        "url": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST"]
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "valuePath": {
+          "type": "string"
+        },
+        "labelPath": {
+          "type": "string"
+        },
+        "cache": {
+          "type": "boolean"
+        },
+        "cacheDuration": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "placeholder": {
+          "type": "string"
+        }
+      }
+    },
+    "SelectFieldProperties": {
+      "type": "object",
+      "properties": {
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FieldOption"
+          }
+        },
+        "allowOther": {
+          "type": "boolean"
+        },
+        "otherLabel": {
+          "type": "string"
+        },
+        "noneOption": {
+          "type": "boolean"
+        },
+        "noneLabel": {
+          "type": "string"
+        },
+        "selectAllOption": {
+          "type": "boolean"
+        },
+        "selectAllLabel": {
+          "type": "string"
+        },
+        "minSelect": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "maxSelect": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "colCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "optionsSource": {
+          "oneOf": [
+            { "$ref": "#/definitions/OptionsSource" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "BooleanFieldProperties": {
+      "type": "object",
+      "properties": {
+        "labelTrue": {
+          "type": "string"
+        },
+        "labelFalse": {
+          "type": "string"
+        },
+        "displayStyle": {
+          "type": "string",
+          "enum": ["switch", "radio", "checkbox"]
+        }
+      }
+    },
+    "ImagePickerChoice": {
+      "type": "object",
+      "required": ["value", "imageUrl"],
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "imageUrl": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "ImagePickerFieldProperties": {
+      "type": "object",
+      "required": ["choices"],
+      "properties": {
+        "choices": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/ImagePickerChoice"
+          }
+        },
+        "multiSelect": {
+          "type": "boolean"
+        },
+        "showLabel": {
+          "type": "boolean"
+        },
+        "imageWidth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "imageHeight": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "RankingChoice": {
+      "type": "object",
+      "required": ["value", "label"],
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "RankingFieldProperties": {
+      "type": "object",
+      "required": ["choices"],
+      "properties": {
+        "choices": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/definitions/RankingChoice"
+          }
+        },
+        "maxSelectedChoices": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "selectToRankEnabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "DateTimeFieldProperties": {
+      "type": "object",
+      "properties": {
+        "minDate": {
+          "type": ["string", "null"]
+        },
+        "maxDate": {
+          "type": ["string", "null"]
+        },
+        "format": {
+          "type": "string"
+        },
+        "disabledDates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "disabledDaysOfWeek": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6
+          }
+        }
+      }
+    },
+    "FileFieldProperties": {
+      "type": "object",
+      "properties": {
+        "accept": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "maxSize": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxFiles": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "multiple": {
+          "type": "boolean"
+        },
+        "allowCamera": {
+          "type": "boolean"
+        }
+      }
+    },
+    "RatingFieldProperties": {
+      "type": "object",
+      "properties": {
+        "maxRating": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "icon": {
+          "type": "string"
+        },
+        "allowHalf": {
+          "type": "boolean"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "displayMode": {
+          "type": "string",
+          "enum": ["buttons", "dropdown"]
+        }
+      }
+    },
+    "MatrixRow": {
+      "type": "object",
+      "required": ["id", "label"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "MatrixColumn": {
+      "type": "object",
+      "required": ["id", "label"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        }
+      }
+    },
+    "MatrixResponsiveMode": {
+      "type": "string",
+      "enum": ["stack", "dropdown", "accordion", "scroll", "forceClassic", "default"],
+      "description": "Responsive display strategy for matrix questions"
+    },
+    "ResponsiveModeSettings": {
+      "type": "object",
+      "properties": {
+        "mobile": {
+          "$ref": "#/definitions/MatrixResponsiveMode"
+        },
+        "tablet": {
+          "$ref": "#/definitions/MatrixResponsiveMode"
+        },
+        "desktop": {
+          "$ref": "#/definitions/MatrixResponsiveMode"
+        }
+      }
+    },
+    "MatrixFieldProperties": {
+      "type": "object",
+      "required": ["rows", "columns"],
+      "properties": {
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/MatrixRow"
+          }
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/definitions/MatrixColumn"
+          }
+        },
+        "alternateRows": {
+          "type": "boolean"
+        },
+        "showHeader": {
+          "type": "boolean"
+        },
+        "responsiveMode": {
+          "$ref": "#/definitions/ResponsiveModeSettings"
+        }
+      }
+    },
+    "MatrixDropdownColumn": {
+      "type": "object",
+      "required": ["name", "label", "cellType"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "cellType": {
+          "$ref": "#/definitions/FieldType"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FieldOption"
+          }
+        }
+      }
+    },
+    "MatrixDropdownFieldProperties": {
+      "type": "object",
+      "required": ["rows", "columns"],
+      "properties": {
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/MatrixRow"
+          }
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/MatrixDropdownColumn"
+          }
+        },
+        "responsiveMode": {
+          "$ref": "#/definitions/ResponsiveModeSettings"
+        }
+      }
+    },
+    "MatrixDynamicColumn": {
+      "type": "object",
+      "required": ["name", "label", "cellType"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "cellType": {
+          "$ref": "#/definitions/FieldType"
+        }
+      }
+    },
+    "MatrixDynamicFieldProperties": {
+      "type": "object",
+      "required": ["columns"],
+      "properties": {
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/MatrixDynamicColumn"
+          }
+        },
+        "minRowCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxRowCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "addRowText": {
+          "type": "string"
+        },
+        "removeRowText": {
+          "type": "string"
+        },
+        "responsiveMode": {
+          "$ref": "#/definitions/ResponsiveModeSettings"
+        }
+      }
+    },
+    "SignatureFieldProperties": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 100
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 50
+        },
+        "penColor": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "backgroundColor": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        }
+      }
+    },
+    "ExpressionFieldProperties": {
+      "type": "object",
+      "required": ["formula"],
+      "properties": {
+        "formula": {
+          "type": "string",
+          "minLength": 1
+        },
+        "precision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unit": {
+          "type": "string"
+        },
+        "displayFormat": {
+          "type": "string",
+          "enum": ["number", "currency", "percent", "text"]
+        }
+      }
+    },
+    "PanelFieldProperties": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "collapsible": {
+          "type": "boolean"
+        },
+        "collapsed": {
+          "type": "boolean"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        }
+      }
+    },
+    "PanelDynamicFieldProperties": {
+      "type": "object",
+      "required": ["fields"],
+      "properties": {
+        "minItems": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxItems": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "addButtonText": {
+          "type": "string"
+        },
+        "removeButtonText": {
+          "type": "string"
+        },
+        "itemLabel": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        }
+      }
+    },
+    "HtmlFieldProperties": {
+      "type": "object",
+      "required": ["content"],
+      "properties": {
+        "content": {
+          "type": "string"
+        }
+      }
+    },
+    "ValidationRuleType": {
+      "type": "string",
+      "enum": [
+        "required",
+        "minLength",
+        "maxLength",
+        "min",
+        "max",
+        "pattern",
+        "email",
+        "url",
+        "minSelect",
+        "maxSelect",
+        "fileSize",
+        "fileType",
+        "custom"
+      ]
+    },
+    "ValidationRule": {
+      "type": "object",
+      "required": ["type", "message"],
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/ValidationRuleType"
+        },
+        "value": {
+          "type": ["string", "number", "array"]
+        },
+        "message": {
+          "type": "string"
+        },
+        "expression": {
+          "type": "string"
+        }
+      }
+    },
+    "FieldValidation": {
+      "type": "object",
+      "required": ["rules"],
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ValidationRule"
+          }
+        }
+      }
+    },
+    "ConditionalOperator": {
+      "type": "string",
+      "enum": [
+        "equals",
+        "notEquals",
+        "contains",
+        "notContains",
+        "gt",
+        "gte",
+        "lt",
+        "lte",
+        "in",
+        "notIn",
+        "isEmpty",
+        "isNotEmpty",
+        "startsWith",
+        "endsWith"
+      ]
+    },
+    "ConditionalAction": {
+      "type": "string",
+      "enum": ["show", "hide", "enable", "disable", "require", "unrequire"]
+    },
+    "Condition": {
+      "type": "object",
+      "required": ["field", "operator"],
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/definitions/ConditionalOperator"
+        },
+        "value": {}
+      }
+    },
+    "Conditional": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["action", "when"],
+          "properties": {
+            "action": {
+              "$ref": "#/definitions/ConditionalAction"
+            },
+            "when": {
+              "$ref": "#/definitions/Condition"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["action", "logicType", "conditions"],
+          "properties": {
+            "action": {
+              "$ref": "#/definitions/ConditionalAction"
+            },
+            "logicType": {
+              "type": "string",
+              "enum": ["and", "or"]
+            },
+            "conditions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/definitions/Condition"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

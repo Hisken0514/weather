@@ -1,0 +1,201 @@
+# =============================================================
+# 危險品風險評分標準 API 測試
+# 使用方式：VS Code 安裝 REST Client 擴充套件後直接點 Send Request
+#
+# 指標／化學品類型現在是每個年度標準各自的資料（RiskIndicatorDefinition /
+# HazardChemicalTypeDefinition），不再是固定 enum。新增時要自己帶一個 GUID
+# 當 Id（前端會用 crypto.randomUUID() 產生），Bands/HazardTypeLevels/
+# QuantityThresholds 用這個 Id 當外鍵引用。下面範例裡的 GUID 只是示意，
+# 實際測試時請自己換一組（或用線上工具產生）。
+# =============================================================
+
+@host = http://localhost:5053
+@contentType = application/json
+
+# ── Step 1：登入取得 token ──────────────────────────────────
+# 先執行這個，把回傳的 accessToken 複製到下方 @token
+
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "your-admin@example.com",
+  "password": "your-password"
+}
+
+###
+
+# 把 login 回傳的 accessToken 貼到這裡
+@token = Bearer <貼上accessToken>
+
+# ── Step 2：建立 115 年評分標準 ────────────────────────────
+# @name createScheme
+
+POST {{host}}/api/risk-scoring/schemes
+Content-Type: {{contentType}}
+Authorization: {{token}}
+
+{
+  "year": 115,
+  "name": "115年危險品風險評分標準",
+  "indicators": [
+    { "id": "00000000-0000-0000-0000-000000000001", "name": "工廠年齡（年）", "category": "Severity", "description": null, "displayOrder": 0 },
+    { "id": "00000000-0000-0000-0000-000000000002", "name": "危險品運作分布總數量", "category": "Severity", "description": null, "displayOrder": 1 },
+    { "id": "00000000-0000-0000-0000-000000000003", "name": "危險品運作類型數", "category": "Severity", "description": null, "displayOrder": 2 },
+    { "id": "00000000-0000-0000-0000-000000000004", "name": "近三年火災爆炸件數", "category": "Probability", "description": null, "displayOrder": 3 },
+    { "id": "00000000-0000-0000-0000-000000000005", "name": "近三年職業災害件數", "category": "Probability", "description": null, "displayOrder": 4 },
+    { "id": "00000000-0000-0000-0000-000000000006", "name": "前次督導結果", "category": "Probability", "description": "0=均已改善，1=未全部改善，2=未曾納入督導", "displayOrder": 5 }
+  ],
+  "chemicalTypes": [
+    { "id": "00000000-0000-0000-0000-000000000101", "name": "易燃固體", "displayOrder": 0 },
+    { "id": "00000000-0000-0000-0000-000000000102", "name": "易燃液體", "displayOrder": 1 },
+    { "id": "00000000-0000-0000-0000-000000000103", "name": "氧化性固體", "displayOrder": 2 },
+    { "id": "00000000-0000-0000-0000-000000000104", "name": "氧化性液體", "displayOrder": 3 },
+    { "id": "00000000-0000-0000-0000-000000000105", "name": "可燃性高壓氣體", "displayOrder": 4 },
+    { "id": "00000000-0000-0000-0000-000000000106", "name": "發火性／禁水性物質", "displayOrder": 5 },
+    { "id": "00000000-0000-0000-0000-000000000107", "name": "自反應物質／有機過氧化物", "displayOrder": 6 }
+  ],
+  "bands": [
+    // 指標一：工廠年齡（百分位數）
+    { "indicatorId": "00000000-0000-0000-0000-000000000001", "minValue": 0,  "maxValue": 13, "score": 5,  "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000001", "minValue": 14, "maxValue": 25, "score": 10, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000001", "minValue": 26, "maxValue": 32, "score": 15, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000001", "minValue": 33, "maxValue": 41, "score": 20, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000001", "minValue": 42, "maxValue": null, "score": 25, "label": null },
+
+    // 指標二：工危品運作分布總數量（百分位數）
+    { "indicatorId": "00000000-0000-0000-0000-000000000002", "minValue": 0,  "maxValue": 3,    "score": 5,  "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000002", "minValue": 4,  "maxValue": 8,    "score": 10, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000002", "minValue": 9,  "maxValue": 17,   "score": 15, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000002", "minValue": 18, "maxValue": 56,   "score": 20, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000002", "minValue": 57, "maxValue": null, "score": 25, "label": null },
+
+    // 指標三：工危品運作類型數（直接對應）
+    { "indicatorId": "00000000-0000-0000-0000-000000000003", "minValue": 1, "maxValue": 1, "score": 5,  "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000003", "minValue": 2, "maxValue": 2, "score": 10, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000003", "minValue": 3, "maxValue": 3, "score": 15, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000003", "minValue": 4, "maxValue": 4, "score": 20, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000003", "minValue": 5, "maxValue": 7, "score": 25, "label": null },
+
+    // 指標五：近三年火災爆炸紀錄（中位數）
+    { "indicatorId": "00000000-0000-0000-0000-000000000004", "minValue": 0, "maxValue": 0,    "score": 1, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000004", "minValue": 1, "maxValue": 2,    "score": 2, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000004", "minValue": 3, "maxValue": 4,    "score": 3, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000004", "minValue": 5, "maxValue": null, "score": 4, "label": null },
+
+    // 指標六：近三年職業災害申報（同上）
+    { "indicatorId": "00000000-0000-0000-0000-000000000005", "minValue": 0, "maxValue": 0,    "score": 1, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000005", "minValue": 1, "maxValue": 2,    "score": 2, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000005", "minValue": 3, "maxValue": 4,    "score": 3, "label": null },
+    { "indicatorId": "00000000-0000-0000-0000-000000000005", "minValue": 5, "maxValue": null, "score": 4, "label": null },
+
+    // 指標七：督導結果（0=均改善, 1=未全改善, 2=未曾納入）— 用 Label 讓計算機顯示成下拉選單
+    { "indicatorId": "00000000-0000-0000-0000-000000000006", "minValue": 0, "maxValue": 0, "score": 1, "label": "均已改善" },
+    { "indicatorId": "00000000-0000-0000-0000-000000000006", "minValue": 1, "maxValue": 1, "score": 2, "label": "未全部改善" },
+    { "indicatorId": "00000000-0000-0000-0000-000000000006", "minValue": 2, "maxValue": 2, "score": 3, "label": "未曾納入督導" }
+  ],
+  "hazardTypeLevels": [
+    // 危害性等級（依表6）
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000101", "hazardLevel": 1 },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000102", "hazardLevel": 1 },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000103", "hazardLevel": 2 },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000104", "hazardLevel": 2 },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000105", "hazardLevel": 3 },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000106", "hazardLevel": 4 },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000107", "hazardLevel": 5 }
+  ],
+  "quantityThresholds": [
+    // 易燃固體（依表7）
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000101", "level": 1, "minQuantity": 0,       "maxQuantity": 750    },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000101", "level": 2, "minQuantity": 751,     "maxQuantity": 5128   },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000101", "level": 3, "minQuantity": 5129,    "maxQuantity": 21000  },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000101", "level": 4, "minQuantity": 21001,   "maxQuantity": 312668 },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000101", "level": 5, "minQuantity": 312669,  "maxQuantity": null   },
+
+    // 易燃液體
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000102", "level": 1, "minQuantity": 0,      "maxQuantity": 350    },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000102", "level": 2, "minQuantity": 351,    "maxQuantity": 1500   },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000102", "level": 3, "minQuantity": 1501,   "maxQuantity": 6475   },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000102", "level": 4, "minQuantity": 6476,   "maxQuantity": 38245  },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000102", "level": 5, "minQuantity": 38246,  "maxQuantity": null   },
+
+    // 氧化性固體
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000103", "level": 1, "minQuantity": 0,       "maxQuantity": 2552    },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000103", "level": 2, "minQuantity": 2553,    "maxQuantity": 13607   },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000103", "level": 3, "minQuantity": 13608,   "maxQuantity": 191695  },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000103", "level": 4, "minQuantity": 191696,  "maxQuantity": 6661500 },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000103", "level": 5, "minQuantity": 6661501, "maxQuantity": null    },
+
+    // 氧化性液體
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000104", "level": 1, "minQuantity": 0,      "maxQuantity": 630    },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000104", "level": 2, "minQuantity": 631,    "maxQuantity": 1800   },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000104", "level": 3, "minQuantity": 1801,   "maxQuantity": 24200  },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000104", "level": 4, "minQuantity": 24201,  "maxQuantity": 687404 },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000104", "level": 5, "minQuantity": 687405, "maxQuantity": null   },
+
+    // 可燃性高壓氣體
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000105", "level": 1, "minQuantity": 0,       "maxQuantity": 1236   },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000105", "level": 2, "minQuantity": 1237,    "maxQuantity": 19200  },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000105", "level": 3, "minQuantity": 19201,   "maxQuantity": 46482  },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000105", "level": 4, "minQuantity": 48483,   "maxQuantity": 101250 },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000105", "level": 5, "minQuantity": 101251,  "maxQuantity": null   },
+
+    // ⚠️ 發火性/禁水性、自反應物質 — 原文表7未列出門檻，請對照原始文件補入
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000106", "level": 1, "minQuantity": 0, "maxQuantity": null },
+    { "chemicalTypeId": "00000000-0000-0000-0000-000000000107", "level": 1, "minQuantity": 0, "maxQuantity": null }
+  ]
+}
+
+###
+
+# ── Step 3：設為生效標準（把 Step 2 回傳的 id 填入） ──────────
+# 把 createScheme 回傳的 id 貼到這裡
+@schemeId = <貼上SchemeId>
+
+POST {{host}}/api/risk-scoring/schemes/{{schemeId}}/activate
+Authorization: {{token}}
+
+###
+
+# ── Step 4：取得標準詳情（確認資料都寫進去了） ────────────────
+
+GET {{host}}/api/risk-scoring/schemes/{{schemeId}}
+Authorization: {{token}}
+
+###
+
+# ── Step 5：計算風險值 ─────────────────────────────────────
+# indicatorId 要用 Step 4 回傳的 indicators[].id（若沿用上面範例的固定 GUID，直接用即可）
+
+POST {{host}}/api/risk-scoring/calculate
+Content-Type: {{contentType}}
+Authorization: {{token}}
+
+{
+  "indicatorValues": [
+    { "indicatorId": "00000000-0000-0000-0000-000000000001", "value": 37 },
+    { "indicatorId": "00000000-0000-0000-0000-000000000002", "value": 22 },
+    { "indicatorId": "00000000-0000-0000-0000-000000000003", "value": 1 },
+    { "indicatorId": "00000000-0000-0000-0000-000000000004", "value": 1 },
+    { "indicatorId": "00000000-0000-0000-0000-000000000005", "value": 1 },
+    { "indicatorId": "00000000-0000-0000-0000-000000000006", "value": 2 }
+  ],
+  "maxHazardChemicalTypeId": "00000000-0000-0000-0000-000000000103",
+  "maxHazardQuantity": 53010
+}
+
+###
+
+# ── 其他：複製標準到 116 年（明年只要調門檻，不用重新設定） ───
+
+POST {{host}}/api/risk-scoring/schemes/{{schemeId}}/clone
+Content-Type: {{contentType}}
+Authorization: {{token}}
+
+{
+  "newYear": 116,
+  "newName": "116年危險品風險評分標準（草稿）"
+}
+
+###

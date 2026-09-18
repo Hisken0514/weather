@@ -1,45 +1,193 @@
 services:
-  db:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: testdb
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "12345!"
+
+  # ================================================
+  # Redis — KPI 系統快取 (dev 版不設密碼，方便除錯)
+  # ================================================
+  kpi_redis:
+    image: redis:7-alpine
+    container_name: kpi-redis
     ports:
-      - "5432:5432"
+      - "6379:6379"
+    command: redis-server --port 6379
+    restart: unless-stopped
+
+  # ================================================
+  # KPI.API 後端
+  # 對外 port 5013（與 KPI.Web next.config.js 的預設 API 位址一致）
+  # JWT 使用 appsettings.Development.json 的硬編碼值，不需另外設定
+  # ================================================
+  kpi-api:
+    build:
+      context: ./src/KPI.API
+      dockerfile: Dockerfile
+    container_name: kpi-api
+    ports:
+      - "5013:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__WebDatabase=${KPI_DB_CONNECTION}
+      - ConnectionStrings__Redis=kpi_redis:6379,abortConnect=false,ssl=False,connectRetry=3
+      # AI 查詢助理（文件 RAG）向量庫 + DataProtection/文件持久化根目錄
+      - ConnectionStrings__AgentVectorDatabase=Host=kpi-agent-db;Port=5432;Database=agent_vector;Username=agent;Password=agent
+      - AgentDocuments__StorageRoot=/app/agent-documents
+      - FormaApiBaseUrl=http://forma-api:5000
+      - FormaInternalSecret=IshaKpi@Internal2026!
+      - LiteLlm__ApiKey=${LITELLM_API_KEY}
     volumes:
-      - pg_data_dev:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      retries: 5
-
-  backend:
-    build:
-      context: ./src/test.backend
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      ASPNETCORE_URLS: "http://+:8080"
-      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=testdb;Username=postgres;Password=12345!"
+      - kpi-agent-documents:/app/agent-documents
+      # 從正式站 kpi-uploads volume scp 下來的督導報告 PDF，bind mount 進來給本機測試用
+      # （對應 wwwroot/Files，跟 docker-compose.prod.yml 的 kpi-uploads volume同一個路徑）。
+      # 這份是正式站真實資料，故意放在 repo 目錄之外，不進 git、不會被誤 commit。
+      # 路徑透過 .env 的 KPI_UPLOADS_HOST_DIR 指定（Windows 用絕對路徑，例如
+      # C:/Users/xxx/docker-data/kpi-uploads），沒設就沿用預設值；這台機器沒有這份
+      # 資料的人不用管這行，預設值指向一個不存在的空目錄，Docker 會自動生成空資料夾掛載。
+      - ${KPI_UPLOADS_HOST_DIR:-./local-data/kpi-uploads}:/app/wwwroot/Files
     depends_on:
-      db:
-        condition: service_healthy
+      - kpi_redis
+      - kpi-agent-db
+    restart: unless-stopped
 
-  frontend:
-    build:
-      context: ./src/test.frontend
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_BASEURL: http://localhost:8080
+  # ================================================
+  # KPI Agent 向量資料庫 (PostgreSQL + pgvector) — dev
+  # AI 查詢助理（文件 RAG）專用，dev 版帳密固定 agent/agent
+  # ================================================
+  kpi-agent-db:
+    image: pgvector/pgvector:pg16
+    container_name: kpi-agent-db
+    ports:
+      - "55433:5432"
+    environment:
+      - POSTGRES_DB=agent_vector
+      - POSTGRES_USER=agent
+      - POSTGRES_PASSWORD=agent
+    volumes:
+      - kpi-agent-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # ================================================
+  # KPI.Web 前端 (Next.js dev server，熱重載)
+  # 存取：http://localhost:3000
+  # API 呼叫由 Next.js rewrites 轉發至 kpi-api:8080
+  # ================================================
+  kpi-web:
+    image: node:24-alpine
+    container_name: kpi-web
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV: production
+      - NODE_ENV=development
+      # Next.js server-side proxy 目標
+      - API=http://kpi-api:8080
+      # dev 模式不使用子路徑，讓路由保持 /
+      - NEXT_PUBLIC_BASE_PATH=
+      # Forma 系統連結（dev 模式下 Forma 在 5173）
+      - NEXT_PUBLIC_FORMA_URL=http://localhost:5173
+    volumes:
+      - ./src/KPI.Web:/app:cached
+      - kpi-web-node-modules:/app/node_modules
+      - kpi-web-next-cache:/app/.next
+    working_dir: /app
+    command: sh -c "yarn install && yarn dev -H 0.0.0.0"
     depends_on:
-      - backend
+      - kpi-api
+    restart: unless-stopped
+
+  # ================================================
+  # Forma.API 後端 (dotnet watch，熱重載)
+  # 對外 port 5053
+  # JWT 設定與 KPI.API dev 值相同，啟用 SSO 測試
+  # ================================================
+  forma-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: backend-dev
+    container_name: forma-api
+    ports:
+      - "5053:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5000
+      - ConnectionStrings__DefaultConnection=${FORMA_DB_CONNECTION}
+      # SSO：與 KPI.API dev 相同的 JWT 設定（對應 appsettings.Development.json）
+      - JwtSettings__SecretKey=bXktc2VjcmV0LXNlY3JldC1rZXktMTIzNDU=
+      - JwtSettings__Issuer=http://localhost:5013/
+      - JwtSettings__Audience=http://localhost:3000/
+      # CORS：允許 Forma.Web dev server（Vite proxy 場景下通常不需要，但保留以防直連）
+      - Cors__AllowedOrigins__0=http://localhost:3000
+      - Cors__AllowedOrigins__1=http://localhost:5173
+      - InternalApi__Secret=IshaKpi@Internal2026!
+    volumes:
+      - ./src:/src:cached
+      - forma-dev-uploads:/app/uploads
+    working_dir: /src/Forma.API
+    command: dotnet watch run --project Forma.API.csproj
+    restart: unless-stopped
+    networks:
+      - default
+      - shared-network
+
+  # ================================================
+  # GovDataMcp — 台灣政府開放資料 MCP server（勞動部/環境部/化學物質署/工廠危險物品）
+  # 原始碼從 ISHAAudit（src/GovDataMcp）複製一份進來，讓這個 repo 自己就能建起完整
+  # dev 環境，不用額外 clone 另一個 repo。給 KPI 的 AI 查詢助理當外部 MCP tool 用。
+  # 宣告成 service 讓它自動跟 kpi-api 同一個 compose 網路，不用再手動 docker network
+  # connect。
+  # ================================================
+  govdata-mcp:
+    build:
+      context: ./src/GovDataMcp
+      dockerfile: Dockerfile
+    container_name: govdata-mcp
+    ports:
+      - "8010:8000"
+    environment:
+      # 環境部工具要用，沒設也能跑，只是 moenv_* 會回傳清楚的錯誤訊息（見該專案 README）
+      - MOENV_API_KEY=${MOENV_API_KEY:-}
+    restart: unless-stopped
+
+  # ================================================
+  # Forma.Web 前端 (Vite dev server，熱重載)
+  # 存取：http://localhost:5173
+  # /api 請求由 Vite proxy 轉發至 forma-api:5000
+  # ================================================
+  forma-web:
+    image: node:22-alpine
+    container_name: forma-web
+    ports:
+      - "5173:5173"
+    environment:
+      # Vite proxy target（對應 vite.config.ts 的 proxy 設定）
+      - VITE_BACKEND_URL=http://forma-api:5000
+      # dev 模式：不使用子路徑，API 路徑保持 /api
+      - VITE_BASE_PATH=/
+      # 側邊欄「前往KPI系統」連結
+      - VITE_KPI_URL=http://localhost:3000
+    volumes:
+      - ./src/Forma.Web:/app:cached
+      - forma-web-node-modules:/app/node_modules
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install --config.confirmModulesPurge=false && pnpm dev --host 0.0.0.0"
+    depends_on:
+      - forma-api
+    restart: unless-stopped
 
 volumes:
-  pg_data_dev:
+  forma-dev-uploads:
+    driver: local
+  kpi-web-node-modules:
+    driver: local
+  kpi-web-next-cache:
+    driver: local
+  forma-web-node-modules:
+    driver: local
+  kpi-agent-db-data:
+    driver: local
+  kpi-agent-documents:
+    driver: local
+
+
+networks:
+  shared-network:
+    external: true

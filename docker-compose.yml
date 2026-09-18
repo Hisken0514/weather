@@ -1,0 +1,131 @@
+services:
+
+  # ===========================================
+  # Nginx — 統一反向代理入口
+  # 路由：
+  #   /              → redirect /iskpi
+  #   /iskpi         → kpi-web:3000  (KPI 前端)
+  #   /iskpi/forma/  → forma:8080    (Forma API + SPA)
+  # ===========================================
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: isha-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - forma
+      - kpi-web
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/iskpi"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ===========================================
+  # Forma — 表單系統 (API + Web SPA 合併)
+  # 內部 port 8080，僅透過 nginx 存取
+  # ===========================================
+  forma:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_BASE_PATH: /iskpi/forma/
+        VITE_API_BASE_URL: /iskpi/forma/api
+        VITE_KPI_URL: /iskpi
+    container_name: forma-app
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=${FORMA_DB_CONNECTION}
+      # SSO：與 KPI 系統共用相同的 JWT 設定，讓 KPI token 在 Forma 中也有效
+      - JwtSettings__SecretKey=${JWT_SECRET}
+      - JwtSettings__Issuer=${JWT_ISSUER}
+      - JwtSettings__Audience=${JWT_AUDIENCE}
+    volumes:
+      - forma-uploads:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ===========================================
+  # Redis — KPI 系統快取
+  # 監聽 port 6380 (與 KPI.API Dockerfile 的設定一致)
+  # ===========================================
+  kpi_redis:
+    image: redis:7-alpine
+    container_name: kpi-redis
+    command: redis-server --requirepass MyP@ssw0rd123 --port 6380
+    volumes:
+      - kpi-redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6380", "-a", "MyP@ssw0rd123", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ===========================================
+  # KPI API 後端
+  # container_name 必須為 kpibackend（KPI.Web 的 API 環境變數寫死此名稱）
+  # ===========================================
+  kpibackend:
+    build:
+      context: ./src/KPI.API
+      dockerfile: Dockerfile
+    container_name: kpi-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__WebDatabase=${KPI_DB_CONNECTION}
+      # Redis 連線覆蓋 Dockerfile 的預設值，確保使用 compose 內的 kpi_redis
+      - ConnectionStrings__Redis=kpi_redis:6380,password=MyP@ssw0rd123,abortConnect=false,ssl=False,connectRetry=3
+      # SSO：KPI 系統的 JWT 設定（兩個系統必須相同，token 才能互相驗證）
+      - JwtSettings__Key=${JWT_SECRET}
+      - JwtSettings__Issuer=${JWT_ISSUER}
+      - JwtSettings__Audience=${JWT_AUDIENCE}
+    depends_on:
+      kpi_redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/swagger/index.html"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ===========================================
+  # KPI Web 前端 (Next.js)
+  # 使用 basePath=/iskpi，由 nginx 路由 /iskpi → 此服務
+  # API 呼叫由 Next.js 在 server side 直接轉發至 kpibackend:8080
+  # ===========================================
+  kpi-web:
+    build:
+      context: ./src/KPI.Web
+      dockerfile: Dockerfile
+      args:
+        BASE_PATH: /iskpi
+        NEXT_PUBLIC_BASE_PATH: /iskpi
+        NEXT_PUBLIC_FORMA_URL: /iskpi/forma/
+    container_name: kpi-web
+    environment:
+      - NODE_ENV=production
+      - API=http://kpibackend:8080
+    depends_on:
+      kpibackend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  forma-uploads:
+    driver: local
+  kpi-redis-data:
+    driver: local

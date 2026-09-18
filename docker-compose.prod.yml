@@ -1,39 +1,153 @@
+name: new-kpi
 services:
-  db:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: testdb
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "12345!"
+
+  # ===========================================
+  # Nginx — 統一反向代理入口
+  # ===========================================
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: isha-nginx
+    ports:
+      - "8888:80"
     volumes:
-      - pg_data_prod:/var/lib/postgresql/data
-    restart: always
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - kpi-nginx-logs:/var/log/nginx
+    depends_on:
+      - forma
+      - kpi-web
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
+      test: ["CMD", "wget", "-q", "--tries=1", "-O", "/dev/null", "http://localhost/iskpi/forma/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ===========================================
+  # Forma — 表單系統 (API + Web SPA 合併)
+  # ===========================================
+  forma:
+    image: ghcr.io/idsl5397/ishanewkpi/forma:latest
+    container_name: forma-app-kpi
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=${FORMA_DB_CONNECTION}
+      - JwtSettings__SecretKey=${JWT_SECRET}
+      - JwtSettings__Issuer=${JWT_ISSUER}
+      - JwtSettings__Audience=${JWT_AUDIENCE}
+      - InternalApi__Secret=IshaKpi@Internal2026!
+    volumes:
+      - forma-uploads:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ===========================================
+  # Redis — KPI 系統快取
+  # ===========================================
+  kpi_redis:
+    image: redis:7-alpine
+    container_name: kpi-redis
+    command: redis-server --requirepass MyP@ssw0rd123 --port 6380
+    volumes:
+      - kpi-redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6380", "-a", "MyP@ssw0rd123", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ===========================================
+  # KPI Agent 向量資料庫 (PostgreSQL + pgvector)
+  # AI 查詢助理（文件 RAG）專用，與 KPI 主庫 (SQL Server) 完全分開。
+  # AgentVectorStoreService 首次同步文件時會自己 CREATE EXTENSION vector / pg_trgm，
+  # 這個 image 已內含 pgvector，pg_trgm 走 postgres contrib。
+  # ===========================================
+  kpi-agent-db:
+    image: pgvector/pgvector:pg16
+    container_name: kpi-agent-db
+    environment:
+      - POSTGRES_DB=${AGENT_VECTOR_DB_NAME:-agent_vector}
+      - POSTGRES_USER=${AGENT_VECTOR_DB_USER:-agent}
+      - POSTGRES_PASSWORD=${AGENT_VECTOR_DB_PASSWORD}
+    volumes:
+      - kpi-agent-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AGENT_VECTOR_DB_USER:-agent} -d ${AGENT_VECTOR_DB_NAME:-agent_vector}"]
+      interval: 10s
+      timeout: 5s
       retries: 5
+      start_period: 10s
 
-  backend:
-    image: ghcr.io/hisken0514/weather/backend:latest
-    ports:
-      - "8080:8080"
+  # ===========================================
+  # KPI API 後端
+  # ===========================================
+  kpibackend:
+    image: ghcr.io/idsl5397/ishanewkpi/kpi-api:latest
+    container_name: kpi-api
     environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=testdb;Username=postgres;Password=12345!"
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__WebDatabase=${KPI_DB_CONNECTION}
+      - ConnectionStrings__Redis=kpi_redis:6380,password=MyP@ssw0rd123,abortConnect=false,ssl=False,connectRetry=3
+      # AI 查詢助理（文件 RAG）向量庫——沒設這條，AgentController 一被呼叫就 500
+      - ConnectionStrings__AgentVectorDatabase=Host=kpi-agent-db;Port=5432;Database=${AGENT_VECTOR_DB_NAME:-agent_vector};Username=${AGENT_VECTOR_DB_USER:-agent};Password=${AGENT_VECTOR_DB_PASSWORD}
+      # DataProtection 金鑰 + 上傳文件的持久化根目錄（見下方 kpi-agent-documents volume）。
+      # 不掛持久卷的話容器重建就換金鑰，DB 裡存的 LiteLLM API Key 會解不開。
+      - AgentDocuments__StorageRoot=/app/agent-documents
+      - JwtSettings__Key=${JWT_SECRET}
+      - JwtSettings__Issuer=${JWT_ISSUER}
+      - JwtSettings__Audience=${JWT_AUDIENCE}
+      - FrontendUrl=https://security.bip.gov.tw/iskpi/login
+      - FormaApiBaseUrl=http://forma:8080
+      - FormaInternalSecret=IshaKpi@Internal2026!
+      - LiteLlm__ApiKey=${LITELLM_API_KEY}
+    volumes:
+      - kpi-uploads:/app/wwwroot/Files
+      - kpi-agent-documents:/app/agent-documents
     depends_on:
-      db:
+      kpi_redis:
         condition: service_healthy
-    restart: always
+      kpi-agent-db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
-  frontend:
-    image: ghcr.io/hisken0514/weather/frontend:latest
-    ports:
-      - "3000:3000"
+  # ===========================================
+  # KPI Web 前端 (Next.js)
+  # ===========================================
+  kpi-web:
+    image: ghcr.io/idsl5397/ishanewkpi/kpi-web:latest
+    container_name: kpi-web
     environment:
-      NODE_ENV: production
+      - NODE_ENV=production
+      - API=http://kpibackend:8080
     depends_on:
-      - backend
-    restart: always
+      kpibackend:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
-  pg_data_prod:
+  forma-uploads:
+    driver: local
+  kpi-redis-data:
+    driver: local
+  kpi-uploads:
+    driver: local
+  kpi-nginx-logs:
+    driver: local
+  kpi-agent-db-data:
+    driver: local
+  kpi-agent-documents:
+    driver: local

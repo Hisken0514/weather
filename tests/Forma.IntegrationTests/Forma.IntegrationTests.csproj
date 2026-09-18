@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Testing Framework -->
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+
+    <!-- ASP.NET Core Integration Testing -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
+
+    <!-- EF Core In-Memory for Testing -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.0" />
+
+    <!-- Testcontainers for Integration Testing -->
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.4.0" />
+    <PackageReference Include="Testcontainers.Redis" Version="4.4.0" />
+
+    <!-- Mocking -->
+    <PackageReference Include="Moq" Version="4.20.72" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Forma.Domain\Forma.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Forma.Application\Forma.Application.csproj" />
+    <ProjectReference Include="..\..\src\Forma.Infrastructure\Forma.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Forma.API\Forma.API.csproj" />
+    <ProjectReference Include="..\..\src\Forma.Shared\Forma.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

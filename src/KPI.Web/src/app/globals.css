@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  color-scheme: light;
+}
+/* global.css */
+/*button:focus-visible {*/
+/*  outline: 4px dashed #ff1493 !important;*/
+/*  outline-offset: 2px !important;*/
+/*  animation: outlineGrow 0.1s ease-out forwards !important;*/
+/*}*/
+
+/* ✅ 覆蓋 AG Grid / Charts 預設 font-size */
+.ag-theme-quartz,
+.ag-charts-theme,
+.ag-root-wrapper {
+  font-size: 0.875rem !important; /* 14px → 0.875rem */
+}
+
+/* 若有其他 page.css 用 px 字級，也一起覆蓋 */
+.report-page {
+  font-size: 1rem;
+}
+:focus-visible {
+  outline: 4px dashed #ff1493 !important;
+  outline-offset: 2px !important;
+}
+
+.outline-dashed-pink:focus-visible {
+  outline: 4px dashed #ff1493 !important;
+  outline-offset: 2px !important;
+}
+
+.btn:focus-visible {
+  outline: 4px dashed #ff1493 !important;
+  outline-offset: 2px !important;
+}
+
+/* 僅在鍵盤操作焦點時顯示輪廓 */
+input:focus-visible {
+  outline: 4px dashed #ff1493 !important;
+  outline-offset: 2px !important;
+}
+
+.myselect__input:focus-visible {
+  outline: none !important;
+}
+/* 移除預設的 focus 樣式 */
+.myselect__control--is-focused {
+  border-color: #ccc !important;
+  box-shadow: none !important;
+}
+
+a:focus-visible {
+  outline: 4px dashed #ff1493 !important;
+  outline-offset: 2px !important;
+}
+
+.custom-select:focus-visible {
+  outline: 4px dashed #ff1493 !important;
+  outline-offset: 2px !important
+}
+
+textarea:focus-visible {
+  outline: 4px dashed #ff1493 !important;
+  outline-offset: 2px !important
+}
+
+.select:focus-visible {
+  outline: 4px dashed #ff1493 !important;
+  outline-offset: 0 !important
+}
+
+.tab:focus-visible {
+  outline: 4px dashed #ff1493 !important;
+  outline-offset: 0 !important
+}
+
+@layer utilities {
+  .custom-outline-pink:focus-visible {
+    outline: 4px dashed #ff1493 !important;
+    outline-offset: 2px !important;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+
+.process-steps{
+  width:100%;
+  text-align: center;
+  .ant-progress {
+    width:100%
+  }
+  .ant-progress .ant-progress-steps-item{
+    width:calc(20% - 2px) !important
+  }
+}
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #000;
+  color: #fff;
+  padding: 8px;
+  text-decoration: none;
+  z-index: 9999;
+  border-radius: 0 0 4px 4px;
+  font-size: 14px;
+  transition: top 0.3s;
+}
+
+.skip-link:focus {
+  top: 0;
+}

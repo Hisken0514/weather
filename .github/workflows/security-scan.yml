@@ -1,0 +1,84 @@
+name: 源碼掃描CICD (NuGet + OSV)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # --- 1. 設定 .NET 環境 ---
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0'
+
+      # --- 2. Restore 相依套件 ---
+      - name: Restore KPI.API dependencies
+        run: dotnet restore src/KPI.API/WebAPI1.sln
+
+      - name: Restore Forma dependencies
+        run: dotnet restore src/Forma.API/Forma.API.csproj
+
+      # --- 3. 檢查 NuGet 漏洞 ---
+      - name: Check KPI.API NuGet vulnerabilities
+        run: dotnet list src/KPI.API/WebAPI1.sln package --vulnerable --include-transitive
+
+      - name: Check Forma NuGet vulnerabilities
+        run: dotnet list src/Forma.API/Forma.API.csproj package --vulnerable --include-transitive
+
+      # --- 4. 執行 OSV-Scanner ---
+      - name: Run OSV-Scanner
+        id: osv-scan
+        uses: google/osv-scanner-action/osv-scanner-action@main
+        with:
+          scan-args: --recursive ./
+        continue-on-error: true
+
+      # --- 5. 產出 Markdown 摘要報告 ---
+      - name: Generate Summary
+        if: always()
+        run: |
+          echo "## 🛡️ 安全掃描報告" >> $GITHUB_STEP_SUMMARY
+          echo "掃描時間: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### 1. OSV-Scanner 結果" >> $GITHUB_STEP_SUMMARY
+          echo "OSV-Scanner outcome: ${{ steps.osv-scan.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### 2. NuGet Vulnerabilities - KPI.API" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          dotnet list src/KPI.API/WebAPI1.sln package --vulnerable --include-transitive >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo "### 3. NuGet Vulnerabilities - Forma" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          dotnet list src/Forma.API/Forma.API.csproj package --vulnerable --include-transitive >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      # --- 6. 判定最後結果 ---
+      - name: Check for vulnerabilities
+        if: always()
+        run: |
+          KPI_VULN=$(dotnet list src/KPI.API/WebAPI1.sln package --vulnerable --include-transitive)
+          FORMA_VULN=$(dotnet list src/Forma.API/Forma.API.csproj package --vulnerable --include-transitive)
+
+          if [[ $KPI_VULN == *"High"* || $KPI_VULN == *"Critical"* || \
+                $FORMA_VULN == *"High"* || $FORMA_VULN == *"Critical"* || \
+                "${{ steps.osv-scan.outcome }}" == "failure" ]]; then
+            echo "❌ 偵測到安全漏洞 (NuGet High/Critical 或 OSV 發現問題)！"
+            exit 1
+          fi
+
+          echo "✅ 未偵測到高危或嚴重漏洞"

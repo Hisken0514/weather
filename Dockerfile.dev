@@ -1,0 +1,19 @@
+# ===========================================
+# Forma - Development Dockerfile
+# ===========================================
+
+# ---------------------------------
+# Backend Development (Hot Reload)
+# ---------------------------------
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-dev
+
+WORKDIR /src
+
+# Install dotnet-watch for hot reload
+ENV DOTNET_USE_POLLING_FILE_WATCHER=true
+ENV DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true
+
+EXPOSE 5000
+
+# Entry point will be overridden by docker-compose
+CMD ["dotnet", "watch", "run"]

@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Forma.Domain\Forma.Domain.csproj" />
+    <ProjectReference Include="..\Forma.Shared\Forma.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Entity Framework Core (for DbSet interface) -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+
+    <!-- Object Mapping (AutoMapper 13+ has built-in DI support) -->
+    <PackageReference Include="AutoMapper" Version="16.1.1" />
+
+    <!-- Validation -->
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+
+    <!-- FIDO2 -->
+    <PackageReference Include="Fido2" Version="4.0.0" />
+    <!-- Fido2 4.0.0 拉進來的 Microsoft.Bcl.Memory 沒有明確釘版本時會落在有漏洞的 9.0.0
+         (GHSA-73j8-2gch-69rq)；Forma.Infrastructure 已經直接釘 10.0.7，這裡也比照辦理。 -->
+    <PackageReference Include="Microsoft.Bcl.Memory" Version="10.0.7" />
+
+    <!-- ASP.NET Core abstractions for IFormFile -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

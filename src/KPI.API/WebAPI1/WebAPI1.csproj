@@ -1,0 +1,82 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Isopoh.Cryptography.Argon2" Version="2.0.0" />
+    <PackageReference Include="JWT" Version="11.0.0" />
+    <PackageReference Include="MailKit" Version="4.17.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.15" />
+    <!-- 覆蓋有漏洞的間接依賴版本（安全性修補） -->
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="7.7.0" />
+    <PackageReference Include="ModelContextProtocol.Core" Version="2.1.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.7.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.0-preview.3.25172.1" />
+    <PackageReference Include="NPOI" Version="2.7.3" />
+    <PackageReference Include="PdfSharpCore" Version="1.3.65" />
+    <PackageReference Include="QuestPDF" Version="2024.10.4" />
+    <PackageReference Include="NReJSON" Version="4.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+    <!-- AI Agent 文件 RAG：向量庫(Postgres+pgvector) 與 PDF 文字擷取 -->
+    <PackageReference Include="Npgsql" Version="9.0.3" />
+    <PackageReference Include="Pgvector" Version="0.3.1" />
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+    <!-- 自架本機 embedding：LiteLLM 目前沒有可用的 embedding 模型部署，改用這個內建
+         小型 ONNX 模型（隨套件內附，不用另外下載、不呼叫任何外部 API）。 -->
+    <PackageReference Include="SmartComponents.LocalEmbeddings" Version="0.1.0-preview10148" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 讓 WebAPI1.Tests 能直接測試 internal 的純邏輯（關鍵字分流判斷、假工具呼叫偵測），
+         不用為了測試把這些方法整個公開出去，也不用透過 reflection 硬測 private 方法。 -->
+    <InternalsVisibleTo Include="WebAPI1.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Models\audit_basic_info.cs" />
+    <Compile Remove="Models\audit_cause.cs" />
+    <Compile Remove="Models\suggest_item.cs" />
+    <Compile Remove="Models\psm_kpi_data.cs" />
+    <Compile Remove="Models\psm_kpi_item.cs" />
+    <Compile Remove="Models\work_position.cs" />
+    <Compile Remove="Models\township_info.cs" />
+    <Compile Remove="Models\psm_kpi_report.cs" />
+    <Compile Remove="Models\psm_kpi_sub_item.cs" />
+    <Compile Remove="Models\industrial_area_info.cs" />
+    <Compile Remove="Models\improve_type_tb.cs" />
+    <Compile Remove="Models\FidoCredentials.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\.dockerignore">
+      <Link>.dockerignore</Link>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Migrations\" />
+    <Folder Include="wwwroot\uploads\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="wwwroot\fonts\msjh.ttc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="wwwroot\fonts\kaiu.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
