@@ -101,6 +101,8 @@ export default function AgentLiteLlmSettingsView() {
     // 正在重新索引中的文件 id 集合——重新索引只是把狀態撥回 Pending，真正重新處理要等
     // 使用者接著按「同步向量」，這裡只用來讓按鈕在請求進行中顯示 loading、避免重複點擊。
     const [reindexingIds, setReindexingIds] = useState<Set<number>>(new Set());
+    const [selectedDocIds, setSelectedDocIds] = useState<Set<number>>(new Set());
+    const [batchReindexing, setBatchReindexing] = useState(false);
 
     const load = () => {
         setLoading(true);
@@ -164,6 +166,31 @@ export default function AgentLiteLlmSettingsView() {
                 return next;
             });
         }
+    };
+
+    // 批次版：勾選多筆文件一次重新索引，邏輯跟單筆一樣，只是省得一筆一筆點。
+    const handleReindexSelected = async () => {
+        if (selectedDocIds.size === 0) return;
+        setBatchReindexing(true);
+        setError(null);
+        try {
+            await api.post("/agent/documents/reindex-batch", { documentIds: Array.from(selectedDocIds) });
+            setSelectedDocIds(new Set());
+            loadIndexStatus();
+            loadDocuments();
+        } catch (err: any) {
+            setError(err?.response?.data?.error || err?.message || "批次重新索引失敗");
+        } finally {
+            setBatchReindexing(false);
+        }
+    };
+
+    const toggleDocSelected = (id: number, checked: boolean) => {
+        setSelectedDocIds(prev => {
+            const next = new Set(prev);
+            if (checked) next.add(id); else next.delete(id);
+            return next;
+        });
     };
 
     const loadModels = async () => {
@@ -463,6 +490,18 @@ export default function AgentLiteLlmSettingsView() {
                         {documents && <span className="text-xs text-gray-400 font-normal">（共 {documents.length} 筆）</span>}
                     </div>
                     <div className="flex items-center gap-2">
+                        {selectedDocIds.size > 0 && (
+                            <button
+                                type="button"
+                                className="btn btn-outline btn-sm"
+                                onClick={handleReindexSelected}
+                                disabled={batchReindexing}
+                                title="清掉這些文件的舊向量資料、狀態撥回待同步（要接著按上面的「同步向量」才會真的重跑）"
+                            >
+                                <RotateCcw className={`h-3 w-3 ${batchReindexing ? "animate-spin" : ""}`} />
+                                重新索引已選 {selectedDocIds.size} 筆
+                            </button>
+                        )}
                         <input
                             className="input input-bordered input-sm"
                             placeholder="搜尋檔名或公司名稱"
@@ -491,6 +530,21 @@ export default function AgentLiteLlmSettingsView() {
                                 <table className="table table-xs table-pin-rows">
                                     <thead>
                                         <tr>
+                                            <th className="w-6">
+                                                <input
+                                                    type="checkbox"
+                                                    className="checkbox checkbox-xs"
+                                                    checked={filtered.length > 0 && filtered.every(d => selectedDocIds.has(d.id))}
+                                                    onChange={e => {
+                                                        const ids = filtered.map(d => d.id);
+                                                        setSelectedDocIds(prev => {
+                                                            const next = new Set(prev);
+                                                            ids.forEach(id => e.target.checked ? next.add(id) : next.delete(id));
+                                                            return next;
+                                                        });
+                                                    }}
+                                                />
+                                            </th>
                                             <th>ID</th>
                                             <th>檔名</th>
                                             <th>公司/廠</th>
@@ -506,6 +560,14 @@ export default function AgentLiteLlmSettingsView() {
                                             const isReindexing = reindexingIds.has(d.id);
                                             return (
                                                 <tr key={d.id}>
+                                                    <td>
+                                                        <input
+                                                            type="checkbox"
+                                                            className="checkbox checkbox-xs"
+                                                            checked={selectedDocIds.has(d.id)}
+                                                            onChange={e => toggleDocSelected(d.id, e.target.checked)}
+                                                        />
+                                                    </td>
                                                     <td className="font-mono">{d.id}</td>
                                                     <td className="max-w-xs truncate" title={d.fileName}>{d.fileName}</td>
                                                     <td>{d.organizationName ?? (d.organizationId == null ? "（公版文件）" : `#${d.organizationId}`)}</td>

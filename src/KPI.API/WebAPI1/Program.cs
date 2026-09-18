@@ -13,6 +13,7 @@ using Microsoft.OpenApi.Models;
 using StackExchange.Redis;
 using WebAPI1.Context;
 using Microsoft.AspNetCore.DataProtection;
+using WebAPI1.Mcp;
 var options  = new WebApplicationOptions
 {
     WebRootPath = "wwwroot"  // 這樣才是正確設定 web root 的方式
@@ -89,6 +90,38 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(WebAPI1.Common.McpOAuthConstants.AuthenticationScheme, options =>
+    {
+        // 對外 /mcp 端點專用的第二組 JwtBearer scheme——驗證 McpAuthorizationServerService
+        // 核發的 access token（aud=isha-kpi-mcp），跟一般登入用的預設 scheme（aud=一般前端網址）
+        // 完全分開，一般登入 token 打不進 /mcp，MCP token 也打不進其他一般 API。
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = jwtSettings.GetValue<bool>("ValidateIssuer"),
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSettings["Issuer"],
+            ValidAudience = WebAPI1.Common.McpOAuthConstants.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"])),
+            ClockSkew = TimeSpan.Zero
+        };
+        options.Events = new JwtBearerEvents
+        {
+            // RFC 9728：沒帶 token 打 /mcp 時，讓 401 的 WWW-Authenticate header 帶上
+            // resource_metadata，外部 MCP client 才能自動探索去哪裡走 OAuth 流程。
+            OnChallenge = context =>
+            {
+                context.HandleResponse();
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                var issuer = builder.Configuration["PublicBaseUrl"]?.TrimEnd('/')
+                    ?? $"{context.Request.Scheme}://{context.Request.Host}";
+                context.Response.Headers.Append("WWW-Authenticate",
+                    $"Bearer resource_metadata=\"{issuer}/.well-known/oauth-protected-resource\"");
+                return Task.CompletedTask;
+            }
+        };
+    })
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
@@ -140,6 +173,12 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("Permission:agent-admin", policy => policy.RequireClaim("permission", "agent-admin"));
     options.AddPolicy("Permission:agent-use", policy => policy.RequireClaim("permission", "agent-use"));
     // ➕ 依你資料庫還有哪些 Permission.Key 自動加上
+
+    // /mcp 端點專用：限定只接受上面那組 "Mcp" scheme 驗證過的 token，一般登入 token（即使
+    // 帶了任何 permission claim）一律不算——兩種 token 的 aud 本來就不同，這裡再擋一次雙重保險。
+    options.AddPolicy(WebAPI1.Common.McpOAuthConstants.AuthorizationPolicy, policy =>
+        policy.AddAuthenticationSchemes(WebAPI1.Common.McpOAuthConstants.AuthenticationScheme)
+              .RequireAuthenticatedUser());
 });
 
 builder.Services.AddHttpsRedirection(options =>
@@ -155,6 +194,16 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
+    });
+
+    // /mcp、/oauth/*、/.well-known/* 專用——外部 MCP client（claude.ai 等）不是同一個瀏覽器
+    // session，不能靠 cookie 驗證，用不到 AllowCredentials，所以另開一個單純 AllowAnyOrigin
+    // 的公開政策，不跟主要的 "AllowAll" 政策混在一起。
+    options.AddPolicy("McpPublic", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
     });
 });
 
@@ -202,6 +251,10 @@ builder.Services.AddScoped<AgentDocumentIngestionService>();
 // MCP OAuth 連接流程的橋接器（開始連接 → 背景等瀏覽器授權 → callback 路由回呼），純記憶體、
 // 短命流程，singleton 就好，不用查資料庫。見 McpOAuthFlowCoordinator 的完整說明。
 builder.Services.AddSingleton<IMcpOAuthFlowCoordinator, McpOAuthFlowCoordinator>();
+
+// KPI 對外開放的 /mcp 端點（OAuth 2.1 Authorization Server + MCP server）。
+builder.Services.AddScoped<IMcpAuthorizationServerService, McpAuthorizationServerService>();
+builder.Services.AddIshaMcpServer();
 
 
 var redisConnectionString = builder.Configuration.GetValue<string>("ConnectionStrings:Redis");
@@ -330,5 +383,6 @@ app.UseCors("AllowAll");
 
 
 app.MapControllers();
+app.MapIshaMcpServer();
 
 app.Run();

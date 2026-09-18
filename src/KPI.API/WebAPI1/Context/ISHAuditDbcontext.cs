@@ -61,6 +61,9 @@ public partial class ISHAuditDbcontext : DbContext
     public virtual DbSet<AgentConversation> AgentConversations { get; set; }
     public virtual DbSet<AgentConversationMessage> AgentConversationMessages { get; set; }
     public virtual DbSet<AgentPromptSetting> AgentPromptSettings { get; set; }
+    public virtual DbSet<McpOAuthClient> McpOAuthClients { get; set; }
+    public virtual DbSet<McpAuthorizationCode> McpAuthorizationCodes { get; set; }
+    public virtual DbSet<McpRefreshToken> McpRefreshTokens { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

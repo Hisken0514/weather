@@ -14,6 +14,9 @@ interface AgentTool {
     mcpEndpointId: number | null;
     mcpEndpointName: string | null;
     roleIds: number[];
+    /** 這個工具能不能被外部 OAuth MCP client（走 /mcp）呼叫——跟 isEnabled（KPI 內部聊天用）分開的獨立開關，
+     * 預設關閉，管理員要手動審核、確定這個工具給外部呼叫沒有風險才開放。 */
+    externalAccessEnabled: boolean;
 }
 
 interface Role {
@@ -44,21 +47,6 @@ const AUTH_TYPE_LABEL: Record<McpAuthType, string> = {
     ApiKey: "API Key",
     OAuth: "OAuth",
 };
-
-/**
- * 批次套用的草稿——每個欄位都可以是「不異動」，跟單筆編輯不一樣。enabled 空字串代表不異動，
- * changeRoles=false 代表角色也不異動。套用時某個工具的某個欄位是「不異動」，就直接用那個工具
- * 自己原本的值送回去——PUT /agent/tools/{id} 是整筆覆蓋，沒有真正的 partial patch，這裡在
- * 前端組出「看起來沒變」的值來模擬。KPI 後端的 UpdateToolRequest 沒有開放改 RiskTier（跟
- * ISHAAudit 那份不一樣，那邊有），所以這裡不做風險等級批次套用，只做啟用/角色。
- */
-interface BatchDraft {
-    enabled: string;
-    changeRoles: boolean;
-    roleIds: number[];
-}
-
-const EMPTY_BATCH_DRAFT: BatchDraft = { enabled: '', changeRoles: false, roleIds: [] };
 
 /** 表頭「全選這個表格裡的工具」checkbox——半選狀態(indeterminate)是 DOM 屬性，不是 HTML attribute，要用 ref 手動設。 */
 const SelectAllCheckbox: React.FC<{ ids: number[]; selectedIds: Set<number>; onToggleAll: (ids: number[], checked: boolean) => void }> = ({ ids, selectedIds, onToggleAll }) => {
@@ -445,6 +433,7 @@ interface ToolTableProps {
     savingToolId: number | null;
     selectedIds: Set<number>;
     onToggleEnabled: (toolId: number) => void;
+    onToggleExternalAccess: (toolId: number) => void;
     onToggleRole: (toolId: number, roleId: number) => void;
     onSave: (tool: AgentTool) => void;
     onToggleOne: (id: number, checked: boolean) => void;
@@ -453,7 +442,7 @@ interface ToolTableProps {
 
 /** 純表格渲染，被「系統內建工具」跟每個 MCP endpoint 手風琴區塊共用，邏輯只寫一份。
  * 最左邊多一欄選取用 checkbox（含表頭全選），跟下面的批次套用列一起用。 */
-function ToolTable({ tools, roles, savingToolId, selectedIds, onToggleEnabled, onToggleRole, onSave, onToggleOne, onToggleAll }: ToolTableProps) {
+function ToolTable({ tools, roles, savingToolId, selectedIds, onToggleEnabled, onToggleExternalAccess, onToggleRole, onSave, onToggleOne, onToggleAll }: ToolTableProps) {
     if (tools.length === 0) {
         return <div className="text-gray-400 text-sm py-2">（沒有工具）</div>;
     }
@@ -468,6 +457,7 @@ function ToolTable({ tools, roles, savingToolId, selectedIds, onToggleEnabled, o
                         <th>說明</th>
                         <th>風險等級</th>
                         <th>啟用</th>
+                        <th title="能不能被外部 OAuth MCP client（走 /mcp）呼叫，跟左邊的「啟用」（KPI 內部聊天用）是分開的獨立開關">外部存取</th>
                         {roles.map(r => <th key={r.id} className="text-center">{r.name}</th>)}
                         <th></th>
                     </tr>
@@ -496,6 +486,15 @@ function ToolTable({ tools, roles, savingToolId, selectedIds, onToggleEnabled, o
                                     className="toggle toggle-primary toggle-sm"
                                     checked={tool.isEnabled}
                                     onChange={() => onToggleEnabled(tool.id)}
+                                />
+                            </td>
+                            <td>
+                                <input
+                                    type="checkbox"
+                                    className="toggle toggle-secondary toggle-sm"
+                                    checked={tool.externalAccessEnabled}
+                                    onChange={() => onToggleExternalAccess(tool.id)}
+                                    title="開放後，外部 OAuth MCP client 就能看到並呼叫這個工具"
                                 />
                             </td>
                             {roles.map(role => (
@@ -527,7 +526,7 @@ function ToolTable({ tools, roles, savingToolId, selectedIds, onToggleEnabled, o
 }
 
 /** 一個 MCP endpoint 的工具收合成一個手風琴區塊，跟系統內建工具的表格完全分開，避免誤點。 */
-function McpToolAccordion({ endpointName, tools, roles, savingToolId, selectedIds, onToggleEnabled, onToggleRole, onSave, onToggleOne, onToggleAll }:
+function McpToolAccordion({ endpointName, tools, roles, savingToolId, selectedIds, onToggleEnabled, onToggleExternalAccess, onToggleRole, onSave, onToggleOne, onToggleAll }:
     ToolTableProps & { endpointName: string }) {
     const [open, setOpen] = useState(false);
     const enabledCount = tools.filter(t => t.isEnabled).length;
@@ -554,6 +553,7 @@ function McpToolAccordion({ endpointName, tools, roles, savingToolId, selectedId
                         savingToolId={savingToolId}
                         selectedIds={selectedIds}
                         onToggleEnabled={onToggleEnabled}
+                        onToggleExternalAccess={onToggleExternalAccess}
                         onToggleRole={onToggleRole}
                         onSave={onSave}
                         onToggleOne={onToggleOne}
@@ -589,7 +589,6 @@ export default function AgentToolCatalogView() {
     const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-    const [batchDraft, setBatchDraft] = useState<BatchDraft>(EMPTY_BATCH_DRAFT);
     const [batchApplying, setBatchApplying] = useState(false);
 
     const flash = (text: string, type: 'success' | 'error' = 'success') => {
@@ -610,7 +609,15 @@ export default function AgentToolCatalogView() {
 
     useEffect(load, []);
 
+    // 跟「啟用」開關同一套邏輯：勾選多項工具後，點其中一列某個角色的 checkbox，
+    // 就對所有勾選項目一起加上/移除同一個角色並立刻存檔，不用另外開框選角色。
     const toggleRole = (toolId: number, roleId: number) => {
+        if (selectedIds.size > 0 && selectedIds.has(toolId)) {
+            const target = tools.find(t => t.id === toolId);
+            if (!target) return;
+            applyRoleBatch(Array.from(selectedIds), roleId, !target.roleIds.includes(roleId));
+            return;
+        }
         setTools(prev => prev.map(t => {
             if (t.id !== toolId) return t;
             const has = t.roleIds.includes(roleId);
@@ -618,15 +625,38 @@ export default function AgentToolCatalogView() {
         }));
     };
 
+    // 勾選多項工具後，直接點其中一列的「啟用」開關，就對所有勾選項目一起套用同一個值並立刻存檔——
+    // 不用另外跳出一個浮動框選「啟用/停用」再按套用，操作跟畫面上看到的東西是同一個。
     const toggleEnabled = (toolId: number) => {
+        if (selectedIds.size > 0 && selectedIds.has(toolId)) {
+            const target = tools.find(t => t.id === toolId);
+            if (!target) return;
+            applyEnabledBatch(Array.from(selectedIds), !target.isEnabled);
+            return;
+        }
         setTools(prev => prev.map(t => t.id === toolId ? { ...t, isEnabled: !t.isEnabled } : t));
+    };
+
+    // 跟「啟用」開關同一套「選取多項時一起套用」邏輯，見上面 toggleEnabled 的說明。
+    const toggleExternalAccess = (toolId: number) => {
+        if (selectedIds.size > 0 && selectedIds.has(toolId)) {
+            const target = tools.find(t => t.id === toolId);
+            if (!target) return;
+            applyExternalAccessBatch(Array.from(selectedIds), !target.externalAccessEnabled);
+            return;
+        }
+        setTools(prev => prev.map(t => t.id === toolId ? { ...t, externalAccessEnabled: !t.externalAccessEnabled } : t));
     };
 
     const handleSave = async (tool: AgentTool) => {
         setSavingToolId(tool.id);
         setError(null);
         try {
-            await api.put(`/agent/tools/${tool.id}`, { isEnabled: tool.isEnabled, roleIds: tool.roleIds });
+            await api.put(`/agent/tools/${tool.id}`, {
+                isEnabled: tool.isEnabled,
+                roleIds: tool.roleIds,
+                externalAccessEnabled: tool.externalAccessEnabled,
+            });
         } catch (err: any) {
             setError(err?.response?.data?.error || err?.message || "儲存失敗");
         } finally {
@@ -654,24 +684,79 @@ export default function AgentToolCatalogView() {
 
     const clearSelection = () => {
         setSelectedIds(new Set());
-        setBatchDraft(EMPTY_BATCH_DRAFT);
     };
 
-    const hasBatchChange = batchDraft.enabled !== '' || batchDraft.changeRoles;
-
-    const handleBatchApply = async () => {
-        if (selectedIds.size === 0 || !hasBatchChange) return;
+    const applyEnabledBatch = async (ids: number[], enabled: boolean) => {
         setBatchApplying(true);
         setError(null);
+        // 先本機樂觀更新，點下去馬上看到開關變色，不用等 API 回來。
+        setTools(prev => prev.map(t => ids.includes(t.id) ? { ...t, isEnabled: enabled } : t));
         try {
-            const ids = Array.from(selectedIds);
             const results = await Promise.allSettled(ids.map(id => {
                 const tool = tools.find(t => t.id === id);
                 return api.put(`/agent/tools/${id}`, {
-                    // 「不異動」的欄位用這個工具自己原本的值送回去，PUT 是整筆覆蓋，
-                    // 不這樣做會把沒勾選要改的欄位也一起蓋掉。
-                    isEnabled: batchDraft.enabled === '' ? (tool?.isEnabled ?? false) : batchDraft.enabled === 'true',
-                    roleIds: batchDraft.changeRoles ? batchDraft.roleIds : (tool?.roleIds ?? []),
+                    isEnabled: enabled,
+                    roleIds: tool?.roleIds ?? [],
+                    externalAccessEnabled: tool?.externalAccessEnabled ?? false,
+                });
+            }));
+            const failedCount = results.filter(r => r.status === 'rejected').length;
+            if (failedCount === 0) {
+                flash(`已套用到 ${ids.length} 項工具`, 'success');
+            } else {
+                flash(`套用完成，但有 ${failedCount}/${ids.length} 項失敗，請檢查`, 'error');
+            }
+            clearSelection();
+            load();
+        } catch {
+            flash('批次套用失敗', 'error');
+        } finally {
+            setBatchApplying(false);
+        }
+    };
+
+    const applyExternalAccessBatch = async (ids: number[], enabled: boolean) => {
+        setBatchApplying(true);
+        setError(null);
+        setTools(prev => prev.map(t => ids.includes(t.id) ? { ...t, externalAccessEnabled: enabled } : t));
+        try {
+            const results = await Promise.allSettled(ids.map(id => {
+                const tool = tools.find(t => t.id === id);
+                return api.put(`/agent/tools/${id}`, {
+                    isEnabled: tool?.isEnabled ?? false,
+                    roleIds: tool?.roleIds ?? [],
+                    externalAccessEnabled: enabled,
+                });
+            }));
+            const failedCount = results.filter(r => r.status === 'rejected').length;
+            if (failedCount === 0) {
+                flash(`已套用到 ${ids.length} 項工具`, 'success');
+            } else {
+                flash(`套用完成，但有 ${failedCount}/${ids.length} 項失敗，請檢查`, 'error');
+            }
+            clearSelection();
+            load();
+        } catch {
+            flash('批次套用失敗', 'error');
+        } finally {
+            setBatchApplying(false);
+        }
+    };
+
+    const applyRoleBatch = async (ids: number[], roleId: number, shouldHave: boolean) => {
+        setBatchApplying(true);
+        setError(null);
+        const nextRoleIds = (roleIds: number[]) =>
+            shouldHave ? (roleIds.includes(roleId) ? roleIds : [...roleIds, roleId]) : roleIds.filter(r => r !== roleId);
+        // 先本機樂觀更新，點下去馬上看到勾選變化，不用等 API 回來。
+        setTools(prev => prev.map(t => ids.includes(t.id) ? { ...t, roleIds: nextRoleIds(t.roleIds) } : t));
+        try {
+            const results = await Promise.allSettled(ids.map(id => {
+                const tool = tools.find(t => t.id === id);
+                return api.put(`/agent/tools/${id}`, {
+                    isEnabled: tool?.isEnabled ?? false,
+                    roleIds: nextRoleIds(tool?.roleIds ?? []),
+                    externalAccessEnabled: tool?.externalAccessEnabled ?? false,
                 });
             }));
             const failedCount = results.filter(r => r.status === 'rejected').length;
@@ -698,7 +783,7 @@ export default function AgentToolCatalogView() {
 
     const tableProps = {
         roles, savingToolId, selectedIds,
-        onToggleEnabled: toggleEnabled, onToggleRole: toggleRole, onSave: handleSave,
+        onToggleEnabled: toggleEnabled, onToggleExternalAccess: toggleExternalAccess, onToggleRole: toggleRole, onSave: handleSave,
         onToggleOne: toggleSelectOne, onToggleAll: toggleSelectAll,
     };
 
@@ -708,65 +793,18 @@ export default function AgentToolCatalogView() {
 
             <McpEndpointPanel onSynced={load} />
 
-            {selectedIds.size > 0 && (
-                <div className="sticky top-0 z-10 bg-white border border-primary/30 rounded-lg p-4 shadow-md space-y-3">
-                    <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm">已選取 {selectedIds.size} 項工具，套用以下設定：</span>
+            <div className="bg-white rounded-xl border shadow-sm p-6 space-y-4">
+                {selectedIds.size > 0 && (
+                    <div className="-mx-6 -mt-6 mb-2 px-6 py-2 bg-primary/10 border-b border-primary/30 flex items-center justify-between text-xs text-primary rounded-t-xl">
+                        <span>
+                            已選取 {selectedIds.size} 項工具{batchApplying && "，套用中..."}
+                            ，點選任一已選取列的「啟用」開關或角色 checkbox 即可套用到全部已選取項目
+                        </span>
                         <button className="btn btn-ghost btn-xs" onClick={clearSelection}>
                             <X className="w-4 h-4 mr-1" />取消選取
                         </button>
                     </div>
-                    <div className="flex flex-wrap items-center gap-6">
-                        <div className="form-control">
-                            <label className="label"><span className="label-text text-xs">啟用</span></label>
-                            <select
-                                className="select select-bordered select-sm"
-                                value={batchDraft.enabled}
-                                onChange={e => setBatchDraft({ ...batchDraft, enabled: e.target.value })}
-                            >
-                                <option value="">不異動</option>
-                                <option value="true">啟用</option>
-                                <option value="false">停用</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div>
-                        <label className="label cursor-pointer gap-2 w-fit">
-                            <input
-                                type="checkbox"
-                                className="checkbox checkbox-sm"
-                                checked={batchDraft.changeRoles}
-                                onChange={e => setBatchDraft({ ...batchDraft, changeRoles: e.target.checked, roleIds: e.target.checked ? batchDraft.roleIds : [] })}
-                            />
-                            <span className="label-text text-xs">異動可見角色（不勾就維持每個工具原本的角色設定）</span>
-                        </label>
-                        {batchDraft.changeRoles && (
-                            <div className="flex flex-wrap gap-2 mt-2">
-                                {roles.map(role => (
-                                    <button
-                                        key={role.id}
-                                        type="button"
-                                        className={`btn btn-xs ${batchDraft.roleIds.includes(role.id) ? 'btn-primary' : 'btn-outline'}`}
-                                        onClick={() => setBatchDraft({
-                                            ...batchDraft,
-                                            roleIds: batchDraft.roleIds.includes(role.id) ? batchDraft.roleIds.filter(r => r !== role.id) : [...batchDraft.roleIds, role.id],
-                                        })}
-                                    >
-                                        {role.name}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex justify-end">
-                        <button className="btn btn-primary btn-sm" onClick={handleBatchApply} disabled={batchApplying || !hasBatchChange}>
-                            <Save className="w-4 h-4 mr-1" />{batchApplying ? '套用中...' : `套用到 ${selectedIds.size} 項工具`}
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            <div className="bg-white rounded-xl border shadow-sm p-6 space-y-4">
+                )}
                 <div className="flex items-center justify-between">
                     <div>
                         <h3 className="text-xl font-semibold text-gray-800 mb-1">系統內建工具</h3>

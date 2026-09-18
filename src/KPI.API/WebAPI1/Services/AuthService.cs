@@ -184,13 +184,21 @@ public class AuthService: IAuthService
             return null;
 
         var typeId = dbUser.Organization.TypeId;
-        // TypeId 2、3、4 為公司階層，其餘（政府型組織）皆為 admin
-        int[] companyTypeIds = { 2, 3, 4 };
-        var baseRole = companyTypeIds.Contains(typeId) ? "company" : "admin";
 
-        // 若使用者在 UserRoles 中被指派 superAdmin，優先回傳 superAdmin
-        var hasSuperAdmin = dbUser.UserRoles.Any(ur => ur.Role?.Name == "superAdmin");
-        var role = hasSuperAdmin ? "superAdmin" : baseRole;
+        // 角色一律以 UserRoles 實際指派為準（優先序：superAdmin > admin > official > company > user）。
+        // 舊邏輯只看組織 TypeId 猜角色——非公司型組織（TypeId 不是 2/3/4）一律猜成 admin，完全沒管
+        // UserRoles 裡真正指派了什麼，導致政府型組織的一般承辦人員（指派 user/official）、甚至連組織
+        // 都還沒分類好的帳號（TypeId=9「未知」，沒有任何角色指派）全部被判定成 admin，後台管理功能、
+        // AI 助手等 admin-only 功能因此對這些人曝露。只有使用者完全沒有任何 UserRoles 指派時，才退回
+        // 組織型別猜測，且猜測不再預設 admin，改成低權限的 company，安全邊界寧可猜低不要猜高。
+        var assignedRoleNames = dbUser.UserRoles.Select(ur => ur.Role?.Name).Where(n => n != null).ToHashSet();
+        string role;
+        if (assignedRoleNames.Contains("superAdmin")) role = "superAdmin";
+        else if (assignedRoleNames.Contains("admin")) role = "admin";
+        else if (assignedRoleNames.Contains("official")) role = "official";
+        else if (assignedRoleNames.Contains("company")) role = "company";
+        else if (assignedRoleNames.Contains("user")) role = "user";
+        else role = "company";
 
         return new UserProfileDto
         {

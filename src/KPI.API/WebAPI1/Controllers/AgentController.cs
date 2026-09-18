@@ -207,6 +207,7 @@ public class AgentController : ControllerBase
                 Source = t.Source.ToString(),
                 RiskTier = t.RiskTier.ToString(),
                 t.IsEnabled,
+                t.ExternalAccessEnabled,
                 t.McpEndpointId,
                 RoleIds = t.AgentToolRoles.Select(tr => tr.RoleId).ToList()
             })
@@ -223,6 +224,7 @@ public class AgentController : ControllerBase
             t.Source,
             t.RiskTier,
             t.IsEnabled,
+            t.ExternalAccessEnabled,
             t.McpEndpointId,
             McpEndpointName = t.McpEndpointId is int epId ? endpointNames.GetValueOrDefault(epId) : null,
             t.RoleIds
@@ -234,6 +236,7 @@ public class AgentController : ControllerBase
     {
         public bool IsEnabled { get; set; }
         public List<int> RoleIds { get; set; } = new();
+        public bool ExternalAccessEnabled { get; set; }
     }
 
     [HttpPut("tools/{toolId:int}")]
@@ -247,6 +250,7 @@ public class AgentController : ControllerBase
         }
 
         tool.IsEnabled = request.IsEnabled;
+        tool.ExternalAccessEnabled = request.ExternalAccessEnabled;
         _db.AgentToolRoles.RemoveRange(tool.AgentToolRoles);
         foreach (var roleId in request.RoleIds.Distinct())
         {
@@ -1198,6 +1202,38 @@ public class AgentController : ControllerBase
         await _db.SaveChangesAsync();
 
         return Ok(new { success = true });
+    }
+
+    public class ReindexDocumentsRequest
+    {
+        public List<int> DocumentIds { get; set; } = new();
+    }
+
+    /// <summary>
+    /// 批次版的重新索引——文件清單勾選多筆後一次送出，邏輯跟單筆 ReindexDocument 一樣，
+    /// 只是省得管理員一筆一筆點。不存在的 id 直接略過，不整批失敗。
+    /// </summary>
+    [HttpPost("documents/reindex-batch")]
+    [Authorize(Policy = "Permission:agent-admin")]
+    public async Task<IActionResult> ReindexDocumentsBatch([FromBody] ReindexDocumentsRequest request, [FromServices] IAgentVectorStoreService vectorStore)
+    {
+        if (request.DocumentIds is null || request.DocumentIds.Count == 0)
+        {
+            return BadRequest(new { error = "請至少選擇一份文件" });
+        }
+
+        var docs = await _db.AgentDocuments.Where(d => request.DocumentIds.Contains(d.Id)).ToListAsync();
+        foreach (var doc in docs)
+        {
+            await vectorStore.DeleteDocumentDataAsync(doc.Id);
+            doc.Status = AgentDocumentStatus.Pending;
+            doc.FailureReason = null;
+            doc.FailureCategory = null;
+            doc.IndexedAt = null;
+        }
+        await _db.SaveChangesAsync();
+
+        return Ok(new { success = true, count = docs.Count });
     }
 
     /// <summary>

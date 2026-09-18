@@ -15,6 +15,7 @@ import EmailVerifyModal from './EmailVerifyModal';
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import {Turnstile} from "@marsidev/react-turnstile";
 import { Eye, EyeOff, Lock } from "lucide-react";
+import { getPostLoginRedirect } from "@/utils/postLoginRedirect";
 // import {useConfirm} from "@/hooks/FoyDialog/useConfirm";
 
 const NPbasePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -60,7 +61,7 @@ export default function Login() {
                 if (!isCancelled) {
                     const currentLoginState = useauthStore.getState().isLoggedIn;
                     if (currentLoginState) {
-                        router.push("/");
+                        router.push(getPostLoginRedirect());
                     }
                 }
             } catch (error) {
@@ -172,7 +173,7 @@ export default function Login() {
                 setErrorMessage("");
 
                 setTimeout(() => {
-                    router.push("/");
+                    router.push(getPostLoginRedirect());
                 }, 100);
             } else {
                 setErrorMessage(resp.message || "登入失敗，請稍後再試");
@@ -362,7 +363,7 @@ export default function Login() {
                                 setIsLoggedIn(true);
                                 setErrorMessage("");
                                 setTimeout(() => {
-                                    router.push("/");
+                                    router.push(getPostLoginRedirect());
                                 }, 100);
                             } else {
                                 setErrorMessage(resp.message || "自動登入失敗，請重新登入");

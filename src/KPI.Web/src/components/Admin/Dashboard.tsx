@@ -51,6 +51,7 @@ import AgentLiteLlmSettingsView from "@/components/Admin/AiAgent/AgentLiteLlmSet
 import AgentToolCatalogView from "@/components/Admin/AiAgent/AgentToolCatalogView";
 import AgentPromptSettingsView from "@/components/Admin/AiAgent/AgentPromptSettingsView";
 import AgentChatTestView from "@/components/Admin/AiAgent/AgentChatTestView";
+import McpOAuthClientsView from "@/components/Admin/AiAgent/McpOAuthClientsView";
 import { RequirePermission } from "@/components/Admin/RequirePermission";
 import { useCan } from "@/hooks/useCan";
 
@@ -124,6 +125,7 @@ export default function AdminDashboard() {
                     { id: "tools", name: "工具目錄" },
                     { id: "prompt", name: "System Prompt" },
                     { id: "agent-chat-test", name: "AI Agent 測試" },
+                    { id: "oauth-clients", name: "外部 MCP Client 管理" },
                 ],
             }] : []),
             {
@@ -289,6 +291,8 @@ export default function AdminDashboard() {
                                         <AgentPromptSettingsView />)
                                     : activeSubMenu === "agent-chat-test" ? (
                                         <AgentChatTestView />)
+                                    : activeSubMenu === "oauth-clients" ? (
+                                        <McpOAuthClientsView />)
                                     : (
                                         <SectionHint text="請在左側選擇子功能" />
                                     )}

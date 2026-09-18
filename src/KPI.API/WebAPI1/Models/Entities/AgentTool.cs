@@ -53,6 +53,11 @@ public class AgentTool
 
     public bool IsEnabled { get; set; } = true;
 
+    /// <summary>「外部存取」開關——只有勾了這個的 InProcess 工具，才會出現在 /mcp 端點的
+    /// tools/list 給外部 MCP client 看到、呼叫。跟 IsEnabled 分開控制：一個工具可以只給
+    /// 內部 AI Agent 用（IsEnabled=true, ExternalAccessEnabled=false），或兩邊都開。</summary>
+    public bool ExternalAccessEnabled { get; set; } = false;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public virtual ICollection<AgentToolRole> AgentToolRoles { get; set; } = new List<AgentToolRole>();

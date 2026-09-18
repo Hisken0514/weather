@@ -24,6 +24,17 @@ const nextConfig= {
             bodySizeLimit: '100mb',
         }
     },
+    // Docker Desktop on Windows 的 bind mount 不會觸發 inotify 事件，
+    // webpack 預設的檔案監控收不到變動，改用輪詢才能在容器內偵測到 host 端的檔案修改
+    webpack: (config, { dev }) => {
+        if (dev) {
+            config.watchOptions = {
+                poll: 800,
+                aggregateTimeout: 300,
+            };
+        }
+        return config;
+    },
     async rewrites() {
         return [
             {
@@ -34,6 +45,18 @@ const nextConfig= {
             {
                 source: "/app/:path*",    // 加上 basePath
                 destination: `${RAG_API}/:path*`,
+                locale: false
+            },
+            {
+                // MCP OAuth 2.1 Authorization Server 的 RFC 端點（discovery/DCR/authorize/token）
+                // 規範要求在網站根目錄，不能掛 /api 前綴，所以另外開一組 rewrite。
+                source: "/oauth/:path*",
+                destination: `${API_URL}/oauth/:path*`,
+                locale: false
+            },
+            {
+                source: "/.well-known/:path*",
+                destination: `${API_URL}/.well-known/:path*`,
                 locale: false
             }
         ];
