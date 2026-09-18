@@ -149,6 +149,10 @@ services:
       - FormaApiBaseUrl=http://forma:8080
       - FormaInternalSecret=IshaKpi@Internal2026!
       - LiteLlm__ApiKey=${LITELLM_API_KEY}
+      # MCP OAuth discovery 文件裡 issuer/resource 網址要用這個，不能靠 Request.Host 自動推斷——
+      # 請求是 nginx→kpi-web→kpi-api 這樣轉發過來的，Host 看到的會是內部 container name，
+      # 外部連不到。填這台主機外部真正能連到的網址（含 /iskpi 這個 basePath）。
+      - PublicBaseUrl=${MCP_PUBLIC_BASE_URL}
     volumes:
       - kpi-uploads:/app/wwwroot/Files
       - kpi-agent-documents:/app/agent-documents
